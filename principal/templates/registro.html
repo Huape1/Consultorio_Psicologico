@@ -1,0 +1,30 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Registro</title>
+    <link rel="stylesheet" href="{% static '/css/public.css' %}" >
+</head>
+
+<body>
+
+    <div class="auth-container">
+        <div class="auth-box">
+            <h2>Registro</h2>
+
+            <input type="text" placeholder="Nombre completo">
+            <input type="email" placeholder="Correo">
+            <input type="password" placeholder="Contraseña">
+
+            <button>Registrarse</button>
+
+            <p style="margin-top:15px;">
+                ¿Ya tienes cuenta? <a href="/login">Inicia sesión</a>
+            </p>
+        </div>
+    </div>
+
+</body>
+
+</html>

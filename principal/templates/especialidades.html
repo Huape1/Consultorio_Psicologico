@@ -1,0 +1,61 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Especialidades</title>
+    <link rel="stylesheet" href="{% static '/css/public.css' %}" >
+</head>
+
+<body>
+
+    <div class="navbar">
+        <div class="logo">FYM</div>
+        <div class="nav-links">
+            <a href="/">Inicio</a>
+            <a href="/login" class="btn-login">Iniciar Sesión</a>
+        </div>
+    </div>
+
+    <section class="section-gray">
+        <h2>Nuestras Especialidades</h2>
+
+        <div class="cards" style="flex-wrap:wrap; gap:40px;">
+
+            <div class="card">
+                <h3>Terapia Individual</h3>
+                <p>Ansiedad, depresión, estrés y desarrollo personal.</p>
+            </div>
+
+            <div class="card">
+                <h3>Terapia de Pareja</h3>
+                <p>Fortalece el vínculo afectivo y mejora la comunicación.</p>
+            </div>
+
+            <div class="card">
+                <h3>Psicología Infantil</h3>
+                <p>Apoyo emocional para niños y adolescentes.</p>
+            </div>
+
+            <div class="card">
+                <h3>Terapia Familiar</h3>
+                <p>Resolución de conflictos familiares.</p>
+            </div>
+
+            <div class="card">
+                <h3>Psicooncología</h3>
+                <p>Acompañamiento emocional ante enfermedades crónicas.</p>
+            </div>
+
+            <div class="card">
+                <h3>Psicopatología</h3>
+                <p>Diagnóstico y tratamiento de trastornos psicológicos.</p>
+            </div>
+
+        </div>
+
+    </section>
+
+</body>
+
+</html>
