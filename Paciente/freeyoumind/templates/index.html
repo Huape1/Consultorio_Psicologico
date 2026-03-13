@@ -1,0 +1,155 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Free You Mind</title>
+
+<link rel="stylesheet" href="{% static 'css/estilo.css' %}">
+
+</head>
+
+<body>
+
+<button class="menu-btn" onclick="toggleMenu()">☰</button>
+
+<div class="sidebar" id="sidebar">
+
+<button class="menu-btn" onclick="toggleMenu()">☰</button>
+
+<div class="logo">Free You Mind</div>
+
+<div class="menu">
+<a onclick="showSection('inicio')"><strong>Inicio</strong></a>
+<a onclick="showSection('agendar')"><strong>Agendar Cita</strong></a>
+<a onclick="showSection('misCitas')"><strong>Mis Citas</strong></a>
+<a onclick="showSection('historial')"><strong>Historial</strong></a>
+<a onclick="showSection('mensajes')"><strong>Mensajes</strong></a>
+<a onclick="showSection('perfil')"><strong>Perfil</strong></a>
+<a onclick="openModal()"><strong>Cerrar Sesión</strong></a>
+</div>
+
+</div>
+
+<div class="content">
+
+<div id="inicio" class="section active">
+
+<h1 id="bienvenida"></h1>
+
+<div class="cards">
+
+<div class="card">
+<h3>Próxima Cita</h3>
+<p id="proximaCita">--</p>
+</div>
+
+<div class="card">
+<h3>Sesiones</h3>
+<p id="sesiones">0</p>
+</div>
+
+<div class="card">
+<h3>Mensajes</h3>
+<p id="contadorMensajes">0</p>
+</div>
+
+</div>
+
+<button onclick="showSection('agendar')"><strong>Agendar Cita</strong></button>
+
+<div class="foto-perfil">
+<label for="foto">
+<img id="preview" src="{% static 'img/perfil.png' %}" class="foto-preview">
+</label>
+
+<input type="file" id="foto" accept="image/*" onchange="mostrarImagen(event)">
+</div>
+
+</div>
+
+<div id="agendar" class="section">
+
+<h1>Agendar Cita</h1>
+
+<select id="doctor">
+<option>Dra. Maria Ester</option>
+<option>Dr. Juan Carlos Rico</option>
+</select>
+
+<input type="date" id="fecha">
+<input type="time" id="hora">
+
+<select id="tipo">
+<option>Virtual</option>
+<option>Presencial</option>
+</select>
+
+<button onclick="confirmarCita()">Confirmar Cita</button>
+
+</div>
+
+<div id="misCitas" class="section">
+
+<h1>Mis Citas</h1>
+
+<div id="listaCitas"></div>
+
+</div>
+
+<div id="historial" class="section">
+
+<h1>Historial</h1>
+
+<div class="box">10 Marzo 2026 - Virtual</div>
+
+</div>
+
+<div id="mensajes" class="section">
+
+<h1>Mensajes</h1>
+
+<div id="listaMensajes"></div>
+
+<textarea id="mensajeTexto" placeholder="Escribe un mensaje"></textarea>
+
+<button onclick="enviarMensaje()">Enviar</button>
+<button onclick="limpiarDatos()">Eliminar todo</button>
+</div>
+
+<div id="perfil" class="section">
+
+<h1>Perfil</h1>
+
+<input type="text" id="perfilNombre">
+<input type="email" id="perfilEmail">
+
+<button onclick="guardarCambios()">Guardar Cambios</button>
+
+</div>
+
+</div>
+
+<div id="logoutModal" class="modal">
+
+<div class="modal-content">
+
+<h2>¿Cerrar sesión?</h2>
+
+<div class="modal-buttons">
+
+<button class="cancel-btn" onclick="closeModal()">Cancelar</button>
+<button class="confirm-btn" onclick="cerrarSesion()">Cerrar</button>
+
+</div>
+
+</div>
+
+</div>
+
+<script src="{% static 'js/script.js' %}"></script>
+
+</body>
+</html>
