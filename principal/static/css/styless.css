@@ -75,7 +75,7 @@ body {
 
 .btn-login {
     background-color: var(--color-primary);
-    color: var(--color-white);
+    color: #e5e7eb;
     border: none;
     padding: 0.625rem 1.5rem;
     border-radius: 0.5rem;
