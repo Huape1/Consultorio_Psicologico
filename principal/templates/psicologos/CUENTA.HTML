@@ -1,0 +1,53 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Cuenta</title>
+    <link rel="stylesheet" href="{% static '/css/psicologos.css' %}">
+</head>
+
+<body>
+
+    <div class="layout">
+
+        <aside class="sidebar">
+            <h2 class="logo">FYM</h2>
+            <a href="/panel" class="menu">Panel principal</a>
+            <a href="/agendas" class="menu">Agendas</a>
+            <a href="/mensajes" class="menu">Mensajes</a>
+            <a href="/cuenta" class="menu active">Cuenta</a>
+            <a href="/" class="menu">Cerrar sesión</a>
+        </aside>
+
+        <main class="main">
+
+            <section class="account-section">
+                <h3>Cuenta</h3>
+            
+                <form class="account-form">
+                    <input type="text" placeholder="Nombre Completo">
+                    <input type="email" placeholder="Correo electrónico">
+                    <input type="text" placeholder="Teléfono">
+                    <input type="text" placeholder="Cédula profesional">
+                    <input type="text" placeholder="Especialidad">
+                    <input type="number" placeholder="Años de experiencia">
+            
+                    <select>
+                        <option>Género</option>
+                        <option>Masculino</option>
+                        <option>Femenino</option>
+                    </select>
+            
+                    <div class="account-buttons">
+                        <button type="button" class="btn-save">Guardar cambios</button>
+                        <button type="button" class="btn-logout">Cerrar sesión</button>
+                    </div>
+                </form>
+            </section>
+
+        </main>
+    </div>
+</body>
+
+</html>

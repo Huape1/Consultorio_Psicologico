@@ -12,3 +12,16 @@ def registro(request):
 
 def especialidades(request):
     return render(request, 'especialidades.html')
+
+#Psicologos
+def panel(request):
+    return render(request, 'psicologos/PANEL.html')
+
+def mensajes(request):
+    return render(request, 'psicologos/mensajes.html')
+
+def cuenta(request):
+    return render(request, 'psicologos/cuenta.html')
+
+def agendas(request):
+    return render(request, 'psicologos/agendas.html')
