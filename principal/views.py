@@ -16,6 +16,10 @@ def especialidades(request):
 def esp(request):
     return render(request, 'esp.html')
 
+#Pacientes
+def paciente(request):
+    return render(request, 'paciente/paciente.html')
+
 #Psicologos
 def panel(request):
     return render(request, 'psicologos/PANEL.html')
@@ -32,3 +36,10 @@ def agendas(request):
 #Admin
 def admin(request):
     return render(request, 'admin/admin.html')
+
+#Inicio2
+def login2(request):
+    return render(request, 'login2.html')
+
+def registro2(request):
+    return render(request, 'registro2.html')
