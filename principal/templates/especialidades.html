@@ -1,61 +1,176 @@
 {% load static %}
 <!DOCTYPE html>
-<html>
-
+<html lang="es">
 <head>
-    <title>Especialidades</title>
-    <link rel="stylesheet" href="{% static '/css/public.css' %}" >
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FYM - Especialidades de Psicología</title>
+    <link rel="stylesheet" href="{% static '/css/styless.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&family=Work+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest\"></script>
 </head>
-
 <body>
+    <!-- Header -->
+    <header class="header">
+        <nav class="nav">
+            <div class="logo">FYM</div>
+            <div class="nav-links">
+                <a href="/">Inicio</a>
+                <button href="/login" class="btn-login">Iniciar Sesión</button>
+            </div>
+        </nav>
+    </header>
 
-    <div class="navbar">
-        <div class="logo">FYM</div>
-        <div class="nav-links">
-            <a href="/">Inicio</a>
-            <a href="/login" class="btn-login">Iniciar Sesión</a>
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Section Title -->
+            <div class="section-header" id="especialidades">
+                <h1>Nuestras Especialidades</h1>
+                <p>Contamos con un equipo de especialistas preparados para acompañarte en cada etapa de tu vida con la empatía y profesionalismo que mereces.</p>
+            </div>
+
+            <!-- Cards Grid -->
+            <div class="cards-grid">
+                <!-- Card 1: Terapia Individual -->
+                <div class="card" data-id="1">
+                    <div class="card-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <h3>Terapia Individual</h3>
+                    <p>Atención personalizada para abordar ansiedad, depresión, estrés y desarrollo personal en un entorno confidencial.</p>
+                    <button class="btn-info" onclick="openModal(1)">Mas información</button>
+                </div>
+
+                <!-- Card 2: Terapia de Pareja -->
+                <div class="card" data-id="2">
+                    <div class="card-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </div>
+                    <h3>Terapia de Pareja</h3>
+                    <p>Mejora la comunicación, resuelve conflictos y fortalece el vínculo afectivo con tu pareja mediante orientación guiada.</p>
+                    <button class="btn-info" onclick="openModal(2)">Mas información</button>
+                </div>
+
+                <!-- Card 3: Psicología Infantil -->
+                <div class="card" data-id="3">
+                    <div class="card-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
+                    </div>
+                    <h3>Psicología Infantil</h3>
+                    <p>Apoyo especializado para niños y adolescentes, abordando problemas de conducta, aprendizaje y gestión emocional.</p>
+                    <button class="btn-info" onclick="openModal(3)">Mas información</button>
+                </div>
+
+                <!-- Card 4: Terapia Familiar -->
+                <div class="card" data-id="4">
+                    <div class="card-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    </div>
+                    <h3>Terapia Familiar</h3>
+                    <p>Intervención enfocada en mejorar la dinámica familiar, fomentando la comprensión mutua y la resolución pacífica de conflictos en el hogar.</p>
+                    <button class="btn-info" onclick="openModal(4)">Mas información</button>
+                </div>
+
+                <!-- Card 5: Psicooncología -->
+                <div class="card" data-id="5">
+                    <div class="card-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                    </div>
+                    <h3>Psicooncología</h3>
+                    <p>Acompañamiento psicológico para pacientes y familiares frente al diagnóstico y tratamiento de enfermedades graves, promoviendo el bienestar emocional.</p>
+                    <button class="btn-info" onclick="openModal(5)">Mas información</button>
+                </div>
+
+                <!-- Card 6: Psicopatología -->
+                <div class="card" data-id="6">
+                    <div class="card-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></svg>
+                    </div>
+                    <h3>Psicopatología</h3>
+                    <p>Evaluación, diagnóstico y tratamiento especializado de trastornos mentales, buscando restaurar la salud psicológica y mejorar tu calidad de vida.</p>
+                    <button class="btn-info" onclick="openModal(6)">Mas información</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Overlay -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal" id="modal" onclick="event.stopPropagation()">
+            <!-- Close Button - MÁS VISIBLE -->
+            <button class="modal-close" onclick="closeModal()" title="Cerrar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+
+            <div class="modal-content">
+                <!-- Left Section -->
+                <div class="modal-left">
+                    <h2 class="modal-title" id="modalTitle">Terapia Individual</h2>
+                    <p class="modal-description" id="modalDescription">
+                        Un espacio seguro y confidencial diseñado para explorar tus pensamientos, emociones y comportamientos.
+                    </p>
+
+                    <!-- Info Grid -->
+                    <div class="info-grid">
+                        <div class="info-card">
+                            <span class="info-label">DURACIÓN</span>
+                            <div class="info-value">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                <span id="modalDuracion">50 Minutos</span>
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <span class="info-label">MODALIDAD</span>
+                            <div class="info-value">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+                                <span id="modalModalidad">Online / Presencial</span>
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <span class="info-label">DIRIGIDO A</span>
+                            <div class="info-value">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                <span id="modalDirigido">Adultos y Adolescentes</span>
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <span class="info-label">PRECIO</span>
+                            <div class="info-value">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                                <span id="modalPrecio">$600 MXN / Sesión</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CTA Button -->
+                    <button class="btn-agendar">
+                        Agendar Primera Sesión
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
+                </div>
+
+                <!-- Right Section - Experiencias -->
+                <div class="modal-right">
+                    <div class="experiencias-header">
+                        <h3>Experiencias</h3>
+                        <div class="rating-badge">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            <span>4.9/5</span>
+                        </div>
+                    </div>
+
+                    <div class="testimonios" id="testimoniosContainer">
+                        <!-- Testimonios se insertan dinámicamente -->
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <section class="section-gray">
-        <h2>Nuestras Especialidades</h2>
-
-        <div class="cards" style="flex-wrap:wrap; gap:40px;">
-
-            <div class="card">
-                <h3>Terapia Individual</h3>
-                <p>Ansiedad, depresión, estrés y desarrollo personal.</p>
-            </div>
-
-            <div class="card">
-                <h3>Terapia de Pareja</h3>
-                <p>Fortalece el vínculo afectivo y mejora la comunicación.</p>
-            </div>
-
-            <div class="card">
-                <h3>Psicología Infantil</h3>
-                <p>Apoyo emocional para niños y adolescentes.</p>
-            </div>
-
-            <div class="card">
-                <h3>Terapia Familiar</h3>
-                <p>Resolución de conflictos familiares.</p>
-            </div>
-
-            <div class="card">
-                <h3>Psicooncología</h3>
-                <p>Acompañamiento emocional ante enfermedades crónicas.</p>
-            </div>
-
-            <div class="card">
-                <h3>Psicopatología</h3>
-                <p>Diagnóstico y tratamiento de trastornos psicológicos.</p>
-            </div>
-
-        </div>
-
-    </section>
-
+    <script src="{% static 'js/script.js' %}"></script>
 </body>
-
 </html>

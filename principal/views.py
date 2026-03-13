@@ -13,6 +13,9 @@ def registro(request):
 def especialidades(request):
     return render(request, 'especialidades.html')
 
+def esp(request):
+    return render(request, 'esp.html')
+
 #Psicologos
 def panel(request):
     return render(request, 'psicologos/PANEL.html')
@@ -25,3 +28,7 @@ def cuenta(request):
 
 def agendas(request):
     return render(request, 'psicologos/agendas.html')
+
+#Admin
+def admin(request):
+    return render(request, 'admin/admin.html')
