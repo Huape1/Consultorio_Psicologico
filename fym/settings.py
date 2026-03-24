@@ -37,7 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'principal'
+    'consultorio'
 ]
 
 MIDDLEWARE = [
@@ -75,7 +75,7 @@ WSGI_APPLICATION = 'fym.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
+        'ENGINE': 'django.db.backends.postgresq1',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
