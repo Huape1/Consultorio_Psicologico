@@ -12,12 +12,46 @@
     <div class="auth-container">
         <div class="auth-box">
             <h2>Registro</h2>
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="mensaje {{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+            <form method="post" action="/registro/">
+                {% csrf_token %}
+                <input type="text" name="nombre" placeholder="Nombre(s)" required>
+                <input type="text" name="primer_apellido" placeholder="Primer apellido" required>
+                <input type="text" name="segundo_apellido" placeholder="Segundo apellido" required>
+                <input type="email" name="correo" placeholder="Correo" required>
+                <input type="password" name="contraseña" placeholder="Contraseña" required>
+                <input type="password" name="confirmar_contraseña" placeholder="Confirmar contraseña" required>
+                <input type="date" name="fechaNacimiento" placeholder="Fecha de nacimiento" required>
+                <input type="text" name="telefono" placeholder="Telefono" required>
+                <div class="form-group">
+                <label class="label-genero">Género:</label>
+                
+                <div class="genero-opciones">
+                    <label class="opcion">
+                        <input type="radio" name="genero" value="M" required>
+                        <span>Masculino</span>
+                    </label>
 
-            <input type="text" placeholder="Nombre completo">
-            <input type="email" placeholder="Correo">
-            <input type="password" placeholder="Contraseña">
+                    <label class="opcion">
+                        <input type="radio" name="genero" value="F">
+                        <span>Femenino</span>
+                    </label>
 
-            <button>Registrarse</button>
+                    <label class="opcion">
+                        <input type="radio" name="genero" value="O">
+                        <span>Otro</span>
+                    </label>
+                </div>
+            </div>
+
+                <button>Registrarse</button>
+            </form>
 
             <p style="margin-top:15px;">
                 ¿Ya tienes cuenta? <a href="/login">Inicia sesión</a>

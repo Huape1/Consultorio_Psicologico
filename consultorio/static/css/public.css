@@ -49,6 +49,43 @@ body {
     align-items: center;
 }
 
+.form-group {
+    margin-bottom: 15px;
+}
+
+.label-genero {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+.genero-opciones {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+    gap: 20px;
+    justify-content: center;
+    justify-items: center;
+}
+
+.opcion {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    justify-content: center; /* 👈 evita que se separen */
+}
+
+@media (max-width: 600px) {
+    .genero-opciones {
+        flex-direction: column;
+        gap: 10px;
+    }
+}
+
+.opcion span {
+    font-size: 14px; 
+}
+
 .hero-text {
     width: 50%;
 }
@@ -271,18 +308,21 @@ body {
 /* AUTH */
 .auth-container {
     background: #b7d1d8;
-    height: 100vh;
+    min-height: 100vh; /* 👈 en vez de height */
     display: flex;
     justify-content: center;
     align-items: center;
+    padding: 20px; /* 👈 espacio para que no se pegue en móvil */
 }
 
 .auth-box {
     background: white;
     padding: 40px;
-    width: 350px;
+    width: 100%;          /* 👈 ocupa todo el espacio disponible */
+    max-width: 350px;     /* 👈 pero no crece más de 350px */
     border-radius: 10px;
     text-align: center;
+    box-sizing: border-box; /* 👈 evita que el padding rompa el ancho */
 }
 
 .auth-box input {
@@ -524,3 +564,19 @@ body {
     }
 }
 
+.mensaje {
+    padding: 12px;
+    margin-bottom: 15px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.mensaje.success {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.mensaje.error {
+    background: #fee2e2;
+    color: #991b1b;
+}

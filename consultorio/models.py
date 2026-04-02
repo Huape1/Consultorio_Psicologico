@@ -130,9 +130,6 @@ class HorPsicologo(models.Model):
 class Paciente(models.Model):
     numero = models.AutoField(primary_key=True)
     fechaNacimiento = models.DateField()
-    dirCalle = models.CharField(max_length=100)
-    dirNum = models.CharField(max_length=20)
-    dirColonia = models.CharField(max_length=100)
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
 
 
