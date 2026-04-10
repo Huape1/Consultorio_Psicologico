@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -110,7 +111,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Tijuana'
 
 USE_I18N = True
 
@@ -130,3 +131,18 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'tu_correo@gmail.com'
 EMAIL_HOST_PASSWORD = 'tu_contraseña_o_app_password'
 
+# Directorio donde se guardarán físicamente las fotos
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Asegúrate de que las cookies se compartan correctamente
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+# Si tu login está en una URL específica, dila aquí:
+LOGIN_URL = '/login/'
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
+AUTH_USER_MODEL = 'consultorio.Usuario'

@@ -1,48 +1,65 @@
-from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login
-from .models import Usuario, TipoUsuario, Paciente, Telefono
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.utils import timezone
+from zoneinfo import ZoneInfo
+from datetime import datetime
+from django.db import transaction
+from django.contrib.auth import get_user_model, logout
+from django.contrib.auth import authenticate, login as auth_login
+from .models import Usuario, TipoUsuario, Paciente, Telefono, EdoCuenta, Especialidad, Horario, Psicologo, HorPsicologo, Conversacion, Mensaje, ConvUsuario
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib import messages
+from django.db.models import Q
 from django.core.mail import send_mail
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+import json
+from django.http import JsonResponse
 
 # Create your views here.
 def index(request):
     return render(request, 'index.html')
 
 def login(request):
-    if request.method == 'GET':
-        return render(request, 'login.html')
+    if request.method == 'POST':
+        correo_login = request.POST.get('correo')
+        password_login = request.POST.get('password')
 
-    correo = request.POST.get('email')
-    password = request.POST.get('password')
+        # 1. Autenticamos
+        user = authenticate(request, username=correo_login, password=password_login)
 
-    try:
-        usuario = Usuario.objects.get(correo=correo)
+        if user is not None:
+            # 2. VALIDACIÓN DE CUENTA ACTIVA
+            # Verificamos si el estadoCuenta NO es 'Activo'
+            # (Ajusta 'nombre' si estadoCuenta es una FK o quítalo si es CharField)
+            estado = getattr(user.estadoCuenta, 'nombre', user.estadoCuenta)
+            
+            if str(estado).lower() != 'activo':
+                messages.error(request, "Tu cuenta está inactiva. Contacta al administrador.")
+                return render(request, 'login.html')
 
-        # 🔐 Verificar contraseña
-        if check_password(password, usuario.contrasena):
+            # 3. Si está activa, logueamos
+            auth_login(request, user)
+            request.session['usuario_id'] = user.numero 
+            
+            # 4. Redirección por tipo
+            tipo = user.tipoUsuario_id
 
-            # ✅ Guardar sesión
-            request.session['usuario_id'] = usuario.numero
-            request.session['nombre'] = usuario.nombrePila
-
-            # 🔀 Redirigir según tipo
-            if usuario.tipoUsuario.clave == 1:  # paciente
-                return redirect('/paciente')
-
-            elif usuario.tipoUsuario.clave == 2:  # psicologo
-                return redirect('/panel')
-
-            elif usuario.tipoUsuario.clave == 3:  # admin
-                return redirect('/admin')
-
+            if tipo == 1:
+                return redirect('/paciente/')
+            elif tipo == 2:
+                return redirect('/panel/')
+            elif tipo == 3:
+                return redirect('admin')
+            else:
+                return redirect('/')
         else:
-            messages.error(request, 'Contraseña incorrecta')
-            return redirect('/login')
-
-    except Usuario.DoesNotExist:
-        messages.error(request, 'El correo no existe')
-        return redirect('/login')
+            # 5. Si authenticate falló
+            messages.error(request, "Credenciales inválidas. Revisa tu correo y contraseña.")
+            # Tip: Revisa en tu terminal si el usuario existe: 
+            # print(Usuario.objects.filter(correo=correo_login).exists())
+    
+    return render(request, 'login.html')
 
 def registro(request):
     if request.method == 'GET':
@@ -74,7 +91,8 @@ def registro(request):
                 segundoApellido=request.POST.get('segundo_apellido'),
                 genero=request.POST.get('genero'),
                 correo=request.POST.get('correo'),
-                contrasena=make_password(password),
+                password=make_password(password),
+                fotoPerfil=request.FILES.get('foto_perfil'),
                 tipoUsuario=tipo_usuario
             )
 
@@ -97,8 +115,55 @@ def registro(request):
             messages.error(request, 'Ocurrió un error al registrarse')
             return redirect('/registro')
 
+@login_required
+def cerrar_sesion(request):
+    logout(request)
+    return redirect('/')
+
 def especialidades(request):
     return render(request, 'especialidades.html')
+
+def guardar_especialidad(request):
+    if request.method == 'POST':
+        try:
+            clave = request.POST.get('clave')
+            nombre = request.POST.get('nombre')
+            descripcion = request.POST.get('descripcion')
+            activo = request.POST.get('activo') == 'true'
+
+            if clave: # Actualizar existente
+                esp = Especialidad.objects.get(clave=clave)
+                esp.nombre = nombre
+                esp.descripcion = descripcion
+                esp.activo = activo
+                esp.save()
+            else: # Crear nueva
+                Especialidad.objects.create(
+                    nombre=nombre,
+                    descripcion=descripcion,
+                    activo=activo
+                )
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+@csrf_exempt # O usa el decorador de permisos que tengas
+@require_POST
+def eliminar_especialidad(request):
+    try:
+        clave = request.POST.get('clave')
+        if clave:
+            especialidad = Especialidad.objects.get(clave=clave)
+            especialidad.delete()
+            return JsonResponse({'success': True})
+        return JsonResponse({'success': False, 'error': 'No se proporcionó la clave'})
+    except Especialidad.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Especialidad no encontrada'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 def esp(request):
     return render(request, 'esp.html')
@@ -108,11 +173,220 @@ def paciente(request):
     return render(request, 'paciente/paciente.html')
 
 #Psicologos
+@transaction.atomic
+def crear_o_editar_psicologo(request):
+    if request.method == 'POST':
+        try:
+            # 1. CAPTURA DE CAMPOS
+            psi_id = request.POST.get('id')
+            nombre = request.POST.get('nombre')
+            ape1 = request.POST.get('apellido1')
+            ape2 = request.POST.get('apellido2', '')
+            genero = request.POST.get('genero')
+            contrasena = request.POST.get('contrasena')
+            estado_nombre = request.POST.get('estado_cuenta') 
+            cedula = request.POST.get('cedula')
+            correo = request.POST.get('correo')
+            tel = request.POST.get('telefono')
+            esp_id = request.POST.get('especialidad_id')
+            hor_id = request.POST.get('horario_id')
+            foto = request.FILES.get('foto')
+
+            # 2. CATALOGOS (Ajustado a tus modelos: EdoCuenta y TipoUsuario)
+            tipo_psi, _ = TipoUsuario.objects.get_or_create(nombre='Psicólogo')
+            
+            if not estado_nombre:
+                estado_nombre = 'Activo'
+            # Asegúrate de que el modelo se llame EdoCuenta como pusiste arriba
+            estado_obj = get_object_or_404(EdoCuenta, nombre=estado_nombre)
+
+            # 3. PROCESAR USUARIO
+            if psi_id and psi_id.strip():
+                # Buscamos por 'numero' que es tu llave primaria
+                usuario = get_object_or_404(Usuario, numero=psi_id)
+                usuario.estadoCuenta = estado_obj
+                
+                # Solo actualizamos contraseña si el usuario escribió algo nuevo
+                if contrasena and contrasena.strip() and contrasena != '••••••••':
+                    usuario.password = make_password(contrasena) # Django usa 'password' por defecto
+            else:
+                # CREAR NUEVO
+                usuario = Usuario(tipoUsuario=tipo_psi, estadoCuenta=estado_obj)
+                usuario.password = make_password(contrasena)
+
+            usuario.nombrePila = nombre
+            usuario.primerApellido = ape1
+            usuario.segundoApellido = ape2
+            usuario.genero = genero
+            usuario.correo = correo # Asegúrate que USERNAME_FIELD sea correo
+            
+            if foto:
+                usuario.fotoPerfil = foto
+            
+            usuario.save()
+
+            # 4. PROCESAR TABLAS RELACIONADAS
+            # Teléfono
+            Telefono.objects.update_or_create(usuario=usuario, defaults={'numTel': tel})
+            
+            # Psicólogo (Datos específicos)
+            esp_obj = get_object_or_404(Especialidad, clave=esp_id)
+            psicologo, _ = Psicologo.objects.update_or_create(
+                usuario=usuario,
+                defaults={'cedula': cedula, 'especialidad': esp_obj}
+            )
+
+            # Horario
+            if hor_id:
+                hor_obj = get_object_or_404(Horario, numero=hor_id)
+                HorPsicologo.objects.filter(psicologo=psicologo).delete()
+                HorPsicologo.objects.create(psicologo=psicologo, horario=hor_obj)
+
+            return JsonResponse({'success': True})
+
+        except Exception as e:
+            # Imprime el error en la terminal para que puedas verlo mientras programas
+            import traceback
+            print(traceback.format_exc())
+            return JsonResponse({'success': False, 'error': str(e)})
+
+def lista_psicologos(request):
+    # Capturar filtros del frontend
+    search_query = request.GET.get('q', '')
+    especialidad_id = request.GET.get('especialidad', '')
+    solo_activos = request.GET.get('activos', 'false') == 'true'
+
+    psicologos = Psicologo.objects.all()
+
+    # Filtro por nombre o apellidos
+    if search_query:
+        psicologos = psicologos.filter(
+            Q(usuario__nombrePila__icontains=search_query) | 
+            Q(usuario__primerApellido__icontains=search_query)
+        )
+
+    # Filtro por especialidad
+    if especialidad_id:
+        psicologos = psicologos.filter(especialidad_id=especialidad_id)
+
+    # Filtro por estado de cuenta
+    if solo_activos:
+        psicologos = psicologos.filter(usuario__estadoCuenta__nombre='Activo')
+
+    # ... retornar a tu template ...
+
+@transaction.atomic
+def dar_de_baja_psicologo(request, id):
+    if request.method == 'POST':
+        try:
+            # Buscamos al psicólogo cuyo USUARIO tenga ese ID
+            psicologo = get_object_or_404(Psicologo, usuario__numero=id)
+            
+            estado_inactivo, _ = EdoCuenta.objects.get_or_create(
+                nombre='Inactivo',
+                defaults={'descripcion': 'Cuenta sin acceso al sistema'}
+            )
+            
+            usuario = psicologo.usuario
+            usuario.estadoCuenta = estado_inactivo
+            usuario.save()
+            
+            return JsonResponse({
+                'success': True, 
+                'message': f'El psicólogo {usuario.nombrePila} ha sido dado de baja.'
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+    return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+        
 def panel(request):
     return render(request, 'psicologos/PANEL.html')
 
 def mensajes(request):
     return render(request, 'psicologos/mensajes.html')
+
+@login_required
+def enviar_mensaje_chat(request):
+    usuario_id = request.POST.get('usuario_id')
+    contenido = request.POST.get('contenido')
+    
+    try:
+        relacion = ConvUsuario.objects.filter(usuario_id=usuario_id).first()
+        if relacion:
+            Mensaje.objects.create(
+                conversacion=relacion.conversacion,
+                usuario=request.user, # Django maneja la PK automáticamente aquí
+                contenido=contenido,
+                fechaEnvio=timezone.now()
+            )
+            return JsonResponse({'status': 'ok'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+def obtener_mensajes(request, usuario_id):
+    try:
+        from .models import ConvUsuario, Mensaje
+        relacion = ConvUsuario.objects.filter(usuario_id=usuario_id).first()
+        
+        if not relacion:
+            return JsonResponse([], safe=False)
+
+        mensajes_qs = Mensaje.objects.filter(
+            conversacion=relacion.conversacion
+        ).select_related('usuario').order_by('fechaEnvio')
+        
+        tz_tijuana = ZoneInfo("America/Tijuana")
+        
+        mensajes_list = []
+        for m in mensajes_qs:
+            # CAMBIO AQUÍ: Usamos .pk para evitar el error de 'id' vs 'numero'
+            es_mio = (m.usuario.pk == request.user.pk)
+            
+            hora_local = m.fechaEnvio.astimezone(tz_tijuana)
+            
+            mensajes_list.append({
+                'texto': m.contenido,
+                'hora': hora_local.strftime('%I:%M %p'),
+                'tipo': 'sent' if es_mio else 'received'
+            })
+            
+        return JsonResponse(mensajes_list, safe=False)
+    except Exception as e:
+        # Esto imprimirá el error real en la terminal para que no se nos escape nada
+        import traceback
+        print(traceback.format_exc())
+        return JsonResponse([], safe=False)
+
+def api_lista_usuarios_chat(request):
+    usuarios_qs = Usuario.objects.exclude(tipoUsuario__nombre='Administrador')
+    data = []
+    ahora = timezone.now()
+
+    for u in usuarios_qs:
+        # Buscamos el último mensaje enviado o recibido por este usuario
+        ultimo_msg = Mensaje.objects.filter(
+            conversacion__convusuario__usuario=u
+        ).order_by('-fechaEnvio').first()
+
+        tiempo_txt = ""
+        if ultimo_msg:
+            diff = ahora - ultimo_msg.fechaEnvio
+            if diff.days > 0:
+                tiempo_txt = f"{diff.days}d"
+            elif diff.seconds >= 3600:
+                tiempo_txt = f"{diff.seconds // 3600}h"
+            elif diff.seconds >= 60:
+                tiempo_txt = f"{diff.seconds // 60}m"
+            else:
+                tiempo_txt = "ahora"
+
+        data.append({
+            'id': u.numero,
+            'nombre': f"{u.nombrePila} {u.primerApellido}",
+            'avatar': u.fotoPerfil.url if u.fotoPerfil else "/media/perfiles/default.png",
+            'ultimo_tiempo': tiempo_txt
+        })
+    return JsonResponse(data, safe=False)
 
 def cuenta(request):
     return render(request, 'psicologos/cuenta.html')
@@ -121,12 +395,301 @@ def agendas(request):
     return render(request, 'psicologos/agendas.html')
 
 #Admin
+@login_required
+def api_dashboard_stats(request):
+    try:
+        # 1. Conteos básicos
+        # CAMBIO: Usamos 'estadoCuenta__nombre' (o el campo que corresponda a 'Activo')
+        # Si 'estadoCuenta' es un campo directo de texto, quita el __nombre
+        psis_activos = Usuario.objects.filter(
+            tipoUsuario__nombre='Psicólogo', 
+            estadoCuenta__nombre='Activo' 
+        ).count()
+        
+        admins_total = Usuario.objects.filter(tipoUsuario__nombre='Administrador').count()
+        pacientes_total = Usuario.objects.filter(tipoUsuario__nombre='Paciente').count()
+        especialidades_total = Especialidad.objects.count()
+        
+        # 2. Reportes (Mensajes que no son del staff)
+        reportes_pendientes = Mensaje.objects.exclude(
+            usuario__tipoUsuario__nombre='Administrador'
+        ).count()
+
+        # 3. Actividades (Últimos 5 mensajes)
+        actividades_qs = Mensaje.objects.select_related('usuario').order_by('-fechaEnvio')[:5]
+        actividades = []
+        
+        ahora = timezone.now()
+        for m in actividades_qs:
+            diff = ahora - m.fechaEnvio
+            if diff.days > 0: tiempo = f"hace {diff.days}d"
+            elif diff.seconds >= 3600: tiempo = f"hace {diff.seconds // 3600}h"
+            elif diff.seconds >= 60: tiempo = f"hace {diff.seconds // 60}m"
+            else: tiempo = "ahora"
+
+            actividades.append({
+                "titulo": f"{m.usuario.nombrePila} {m.usuario.primerApellido}",
+                "descripcion": m.contenido[:40] + "..." if len(m.contenido) > 40 else m.contenido,
+                "tiempo": tiempo,
+                "avatar": m.usuario.fotoPerfil.url if m.usuario.fotoPerfil else None
+            })
+
+        return JsonResponse({
+            "status": "success",
+            "stats": {
+                "psis_activos": psis_activos,
+                "admins_total": admins_total,
+                "pacientes_total": pacientes_total,
+                "reportes_pendientes": reportes_pendientes,
+                "especialidades_total": especialidades_total
+            },
+            "actividades": actividades
+        })
+
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+@login_required
 def admin(request):
-    return render(request, 'admin/admin.html')
+    usuario_id = request.session.get('usuario_id')
+    if not usuario_id:
+        return redirect('/login')
+        
+    try:
+        # 1. Usuario logeado
+        usuario_actual = request.user
+        
+        # --- FILTROS PARA PSICÓLOGOS ---
+        search_query = request.GET.get('q', '')
+        especialidad_id = request.GET.get('especialidad', '')
+        solo_activos = request.GET.get('activos') == 'on'
 
-#Inicio2
-def login2(request):
-    return render(request, 'login2.html')
+        # 2. Lista de Administradores (Se mantiene igual)
+        admins_list = []
+        admins_qs = Usuario.objects.filter(tipoUsuario__nombre='Administrador').select_related('tipoUsuario', 'estadoCuenta')
+        for adm in admins_qs:
+            tel_obj = Telefono.objects.filter(usuario=adm).first()
+            admins_list.append({
+                'numero': adm.numero,
+                'nombrePila': adm.nombrePila,
+                'primerApellido': adm.primerApellido,
+                'segundoApellido': adm.segundoApellido or "",
+                'correo': adm.correo,
+                'telefono': tel_obj.numTel if tel_obj else "",
+                'rol_nombre': adm.tipoUsuario.nombre,
+                'estado_cuenta_nombre': adm.estadoCuenta.nombre if adm.estadoCuenta else "Inactivo",
+                'foto_url': adm.fotoPerfil.url if adm.fotoPerfil else '/static/img/default.png',
+            })
 
-def registro2(request):
-    return render(request, 'registro2.html')
+        # 3. Lista de Psicólogos con FILTROS y DATOS COMPLETOS
+        psicologos_list = []
+        psicologos_qs = Psicologo.objects.select_related('usuario', 'especialidad', 'usuario__estadoCuenta').all()
+
+        # Aplicación de filtros de Django
+        if search_query:
+            psicologos_qs = psicologos_qs.filter(
+                Q(usuario__nombrePila__icontains=search_query) | 
+                Q(usuario__primerApellido__icontains=search_query) |
+                Q(cedula__icontains=search_query)
+            )
+        if especialidad_id:
+            psicologos_qs = psicologos_qs.filter(especialidad_id=especialidad_id)
+        if solo_activos:
+            psicologos_qs = psicologos_qs.filter(usuario__estadoCuenta__nombre='Activo')
+
+        for p in psicologos_qs:
+            tel_obj = Telefono.objects.filter(usuario=p.usuario).first()
+            relacion_horario = HorPsicologo.objects.filter(psicologo=p).select_related('horario').first()
+            
+            psicologos_list.append({
+                'id': p.usuario.numero,
+                'nombre': f"{p.usuario.nombrePila} {p.usuario.primerApellido} {p.usuario.segundoApellido or ''}".strip(),
+                'email': p.usuario.correo,
+                'telefono': tel_obj.numTel if tel_obj else "",
+                'genero': p.usuario.genero, # <--- IMPORTANTE para el modal
+                'cedula': p.cedula,         # <--- IMPORTANTE para el modal
+                'estado_cuenta': p.usuario.estadoCuenta.nombre if p.usuario.estadoCuenta else "Inactivo",
+                'especialidad': p.especialidad.nombre,
+                'especialidad_clave': p.especialidad.clave,
+                'horario_id': relacion_horario.horario.numero if relacion_horario else None,
+                'dias': relacion_horario.horario.dias if relacion_horario else "Sin asignar",
+                'horario': relacion_horario.horario.horas if relacion_horario else "--:--",
+                'avatar': p.usuario.fotoPerfil.url if p.usuario.fotoPerfil else '/static/img/default.png',
+            })
+
+        # 4. Lista de Especialidades (Simplificada)
+        especialidades_list = list(Especialidad.objects.values('clave', 'nombre', 'descripcion', 'activo'))
+        
+        # 5. Lista de Horarios (Simplificada)
+        horarios_list = list(Horario.objects.values('numero', 'nombre', 'dias', 'horas', 'icono', 'activo'))
+
+        contexto = {
+            'usuario': usuario_actual,
+            'todos_los_administradores_json': admins_list,
+            'psicologos_json': psicologos_list,
+            'especialidades_json': especialidades_list,
+            'horarios_json': horarios_list
+        }
+
+        return render(request, 'admin/admin.html', contexto)
+
+    except Usuario.DoesNotExist:
+        return redirect('/login')
+
+@csrf_exempt
+def crear_admin(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+
+            # 1. Validaciones (Correo y Teléfono)
+            if Usuario.objects.filter(correo=data['correo']).exists():
+                return JsonResponse({'error': 'El correo ya está registrado'}, status=400)
+            
+            # 2. Obtener catálogos necesarios
+            tipo_admin, _ = TipoUsuario.objects.get_or_create(nombre='Administrador')
+            # BUSCAMOS EL ESTADO ACTIVO (Si no existe, se crea)
+            estado_activo, _ = EdoCuenta.objects.get_or_create(nombre='Activo')
+
+            # 3. Crear el Usuario con el estado 'Activo'
+            nuevo_usuario = Usuario.objects.create(
+                nombrePila=data['nombre'],
+                primerApellido=data['primer_apellido'],
+                segundoApellido=data.get('segundo_apellido', ''),
+                genero=data['genero'],
+                correo=data['correo'],
+                password=make_password(data['password']),
+                tipoUsuario=tipo_admin,
+                estadoCuenta=estado_activo  # <--- ASIGNAMOS EL ESTADO AQUÍ
+            )
+
+            # 4. Crear Teléfono
+            if data.get('telefono'):
+                Telefono.objects.create(
+                    numTel=data['telefono'],
+                    usuario=nuevo_usuario
+                )
+
+            return JsonResponse({'success': 'Administrador creado y activo'})
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+def editar_admin(request):
+    if request.method == 'POST':
+        try:
+            admin_id = request.POST.get('id')
+            usuario = Usuario.objects.get(numero=admin_id)
+            
+            # 1. Actualizar Datos Básicos
+            usuario.nombrePila = request.POST.get('nombre')
+            usuario.primerApellido = request.POST.get('primer_apellido')
+            usuario.segundoApellido = request.POST.get('segundo_apellido')
+            usuario.correo = request.POST.get('correo')
+            
+            # 2. Actualizar Foto si viene
+            if 'foto' in request.FILES:
+                usuario.fotoPerfil = request.FILES['foto']
+            
+            # 3. Actualizar Password si no está vacío
+            password = request.POST.get('password')
+            if password and password.strip():
+                usuario.password = make_password(password)
+            
+            # 4. Actualizar Estado de Cuenta
+            estado_nombre = request.POST.get('estado') # 'Activo' o 'Inactivo'
+            if estado_nombre:
+                estado_obj = EdoCuenta.objects.get(nombre=estado_nombre)
+                usuario.estadoCuenta = estado_obj
+            
+            usuario.save()
+
+            # 5. Actualizar Teléfono
+            tel_num = request.POST.get('telefono')
+            if tel_num:
+                tel_obj, _ = Telefono.objects.get_or_create(usuario=usuario)
+                tel_obj.numTel = tel_num
+                tel_obj.save()
+
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+
+@csrf_exempt 
+def desactivar_admin(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            admin_id = data.get('id')
+            
+            # 1. Buscamos al usuario por su número (el ID en tu tabla Usuario)
+            usuario = Usuario.objects.get(numero=admin_id)
+            
+            # Evitar que el admin se desactive a sí mismo (Opcional pero recomendado)
+            if request.user.is_authenticated and request.user.numero == int(admin_id):
+                return JsonResponse({'error': 'No puedes desactivar tu propia cuenta mientras estás logueado.'}, status=400)
+            
+            # 2. Buscamos o creamos el objeto del estado "Inactivo"
+            estado_inactivo, _ = EdoCuenta.objects.get_or_create(
+                nombre='Inactivo',
+                defaults={'descripcion': 'Cuenta sin acceso al sistema'}
+            )
+            
+            # 3. Asignamos el estado y guardamos
+            usuario.estadoCuenta = estado_inactivo
+            usuario.save()
+            
+            return JsonResponse({'success': True})
+
+        except Usuario.DoesNotExist:
+            return JsonResponse({'error': 'El administrador no existe.'}, status=404)
+        except Exception as e:
+            print(f"Error en desactivar_admin: {e}")
+            return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+def guardar_horario(request):
+    if request.method == 'POST':
+        try:
+            numero = request.POST.get('numero')
+            nombre = request.POST.get('nombre')
+            icono = request.POST.get('icono')
+            dias = request.POST.get('dias')
+            horas = request.POST.get('horas')
+            activo = request.POST.get('activo') == 'true'
+
+            if numero: # Editar
+                h = Horario.objects.get(numero=numero)
+                h.nombre = nombre
+                h.icono = icono
+                h.dias = dias
+                h.horas = horas
+                h.activo = activo
+                h.save()
+            else: # Crear
+                Horario.objects.create(
+                    nombre=nombre,
+                    icono=icono,
+                    dias=dias,
+                    horas=horas,
+                    activo=activo
+                )
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+
+def tu_vista_admin(request):
+    # 1. Traemos los datos de la base de datos
+    horarios_qs = Horario.objects.all()
+    
+    # 2. Convertimos a lista de diccionarios (muy importante)
+    horarios_list = list(horarios_qs.values('numero', 'nombre', 'dias', 'horas', 'icono', 'activo'))
+    
+    context = {
+        'horarios_json': horarios_list, # Enviamos la lista al HTML
+        # ... tus otros datos ...
+    }
+    return render(request, 'admin.html', context)
