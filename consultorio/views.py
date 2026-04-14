@@ -4,15 +4,16 @@ from django.utils import timezone
 from zoneinfo import ZoneInfo
 from datetime import datetime
 from django.db import transaction
-from django.contrib.auth import get_user_model, logout
+from django.contrib.auth import logout
 from django.contrib.auth import authenticate, login as auth_login
-from .models import Usuario, TipoUsuario, Paciente, Telefono, EdoCuenta, Especialidad, Horario, Psicologo, HorPsicologo, Conversacion, Mensaje, ConvUsuario
-from django.contrib.auth.hashers import make_password, check_password
+from .models import Usuario, TipoUsuario, Paciente, Telefono, EdoCuenta, Sesion, Pago, Especialidad, Horario, Psicologo, HorPsicologo, Conversacion, Mensaje, ConvUsuario, Cita, Modalidad, EdoCita, Servicio, Consulta
+from django.contrib.auth.hashers import make_password
 from django.contrib import messages
-from django.db.models import Q
-from django.core.mail import send_mail
+from django.db.models import Q, Count
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 import json
 from django.http import JsonResponse
 
@@ -166,11 +167,69 @@ def eliminar_especialidad(request):
         return JsonResponse({'success': False, 'error': str(e)})
 
 def esp(request):
-    return render(request, 'esp.html')
+    return render(request, 'panel_psicologo')
 
 #Pacientes
 def paciente(request):
-    return render(request, 'paciente/paciente.html')
+    # 1. Obtener instancia del paciente
+    paciente_instancia = get_object_or_404(Paciente, usuario=request.user)
+    
+    # --- PROCESAMIENTO DE FORMULARIOS (POST) ---
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        # A. AGENDAR CITA
+        if action == 'agendar_cita':
+            psi_id = request.POST.get('psicologo_id')
+            fecha = request.POST.get('fecha')
+            hora = request.POST.get('hora')
+            mod_nombre = request.POST.get('modalidad_nombre')
+            
+            psicologo = get_object_or_404(Psicologo, numero=psi_id)
+            modalidad, _ = Modalidad.objects.get_or_create(nombre=mod_nombre or 'Virtual')
+            estado_pend, _ = EdoCita.objects.get_or_create(nombre='Pendiente')
+            
+            # Buscamos servicio, si no existe lo creamos con precio incluido
+            servicio = Servicio.objects.first()
+            if not servicio:
+                servicio = Servicio.objects.create(
+                    nombre="Consulta General", 
+                    descripcion="Sesión estándar",
+                    precio=0  # Ajusta este valor según tu modelo
+                )
+
+            Cita.objects.create(
+                fecha=fecha, 
+                hora=hora, 
+                motivo="Consulta",
+                psicologo=psicologo, 
+                paciente=paciente_instancia,
+                servicio=servicio, 
+                modalidad=modalidad, 
+                estado=estado_pend
+            )
+            messages.success(request, "¡Cita agendada correctamente!")
+
+        # B. ACTUALIZAR PERFIL
+        elif action == 'actualizar_perfil':
+            request.user.nombrePila = request.POST.get('nombre')
+            request.user.email = request.POST.get('email')
+            request.user.save()
+            messages.success(request, "Perfil actualizado con éxito.")
+
+        return redirect('/paciente/')
+
+    # --- CARGA DE DATOS PARA LA INTERFAZ ---
+    citas_queryset = Cita.objects.filter(paciente=paciente_instancia).order_by('-fecha')
+    
+    contexto = {
+        'psicologos': Psicologo.objects.all(),
+        'citas': citas_queryset,
+        'conteo_sesiones': citas_queryset.count(),
+        'proxima_cita': citas_queryset.filter(fecha__gte=timezone.now().date()).last(),
+    }
+    
+    return render(request, 'paciente/paciente.html', contexto)
 
 #Psicologos
 @transaction.atomic
@@ -299,49 +358,75 @@ def dar_de_baja_psicologo(request, id):
             return JsonResponse({'success': False, 'error': str(e)}, status=500)
     return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
         
+@login_required
 def panel(request):
+    # 1. Obtener el perfil del psicólogo logueado
+    try:
+        psicologo = Psicologo.objects.get(usuario=request.user)
+    except Psicologo.DoesNotExist:
+        # Si el usuario no es psicólogo, podrías redirigirlo o mostrar un error
+        messages.error(request, "No tienes perfil de psicólogo asignado.")
+        return redirect('/')
+
+    # 2. Datos para el Panel Principal (Estadísticas)
+    # Obtenemos citas del día de hoy
+    hoy = timezone.now().date()
+    citas_hoy_count = Cita.objects.filter(psicologo=psicologo, fecha=hoy).count()
+    
+    # Pacientes únicos que atiende este psicólogo
+    pacientes_activos = Paciente.objects.filter(cita__psicologo=psicologo).distinct().count()
+    
+    # 3. Listado de Citas para la tabla del Panel
+    citas_pendientes = Cita.objects.filter(
+        psicologo=psicologo, 
+        estado__nombre='Pendiente' # Asegúrate que este nombre exista en EdoCita
+    ).order_by('fecha', 'hora')
+
+    # 4. Listado de Citas para la sección de Agendas (todas)
+    todas_las_citas = Cita.objects.filter(psicologo=psicologo).order_by('-fecha')
+
+    # 5. Teléfono del psicólogo para la sección de Cuenta
+    telefono_obj = Telefono.objects.filter(usuario=request.user).first()
+
+    contexto = {
+        'psicologo': psicologo,
+        'citas_hoy': citas_hoy_count,
+        'pacientes_activos': pacientes_activos,
+        'citas': citas_pendientes,
+        'agendas': todas_las_citas,
+        'telefono': telefono_obj.numTel if telefono_obj else "",
+    }
+    return render(request, 'psicologos/psicologo.html', contexto)
     return render(request, 'psicologos/PANEL.html')
 
 def mensajes(request):
-    return render(request, 'psicologos/mensajes.html')
+    return render(request, 'psicologos/psicologo.html')
 
 @login_required
-def enviar_mensaje_chat(request):
-    usuario_id = request.POST.get('usuario_id')
-    contenido = request.POST.get('contenido')
-    
-    try:
-        relacion = ConvUsuario.objects.filter(usuario_id=usuario_id).first()
-        if relacion:
-            Mensaje.objects.create(
-                conversacion=relacion.conversacion,
-                usuario=request.user, # Django maneja la PK automáticamente aquí
-                contenido=contenido,
-                fechaEnvio=timezone.now()
-            )
-            return JsonResponse({'status': 'ok'})
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
 def obtener_mensajes(request, usuario_id):
     try:
-        from .models import ConvUsuario, Mensaje
-        relacion = ConvUsuario.objects.filter(usuario_id=usuario_id).first()
+        # 1. Buscamos la conversación donde participan AMBOS (el logueado y el seleccionado)
+        # Esto evita que los mensajes se mezclen con otros chats
+        convs_usuario_actual = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion', flat=True)
+        relacion = ConvUsuario.objects.filter(
+            conversacion__in=convs_usuario_actual, 
+            usuario_id=usuario_id
+        ).first()
         
         if not relacion:
             return JsonResponse([], safe=False)
 
+        # 2. Traemos los mensajes de esa conversación específica
         mensajes_qs = Mensaje.objects.filter(
             conversacion=relacion.conversacion
         ).select_related('usuario').order_by('fechaEnvio')
         
         tz_tijuana = ZoneInfo("America/Tijuana")
-        
         mensajes_list = []
+        
         for m in mensajes_qs:
-            # CAMBIO AQUÍ: Usamos .pk para evitar el error de 'id' vs 'numero'
+            # Comparamos PKs para evitar conflictos entre 'id' y 'numero'
             es_mio = (m.usuario.pk == request.user.pk)
-            
             hora_local = m.fechaEnvio.astimezone(tz_tijuana)
             
             mensajes_list.append({
@@ -352,10 +437,42 @@ def obtener_mensajes(request, usuario_id):
             
         return JsonResponse(mensajes_list, safe=False)
     except Exception as e:
-        # Esto imprimirá el error real en la terminal para que no se nos escape nada
-        import traceback
-        print(traceback.format_exc())
-        return JsonResponse([], safe=False)
+        return JsonResponse({'error': str(e)}, status=500, safe=False)
+
+def enviar_mensaje_chat(request):
+    if request.method == 'POST':
+        usuario_id = request.POST.get('usuario_id') # El ID del paciente/destinatario
+        contenido = request.POST.get('contenido')
+        
+        try:
+            # 1. Buscamos la conversación compartida entre los dos
+            convs_usuario_actual = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion', flat=True)
+            relacion = ConvUsuario.objects.filter(
+                conversacion__in=convs_usuario_actual, 
+                usuario_id=usuario_id
+            ).first()
+
+            # 2. Si no existe conversación entre ellos, la creamos (importante para el primer mensaje)
+            if not relacion:
+                nueva_conv = Conversacion.objects.create(fechaInicio=timezone.now())
+                ConvUsuario.objects.create(conversacion=nueva_conv, usuario=request.user)
+                ConvUsuario.objects.create(conversacion=nueva_conv, usuario_id=usuario_id)
+                target_conv = nueva_conv
+            else:
+                target_conv = relacion.conversacion
+
+            # 3. Guardamos el mensaje
+            Mensaje.objects.create(
+                conversacion=target_conv,
+                usuario=request.user,
+                contenido=contenido,
+                fechaEnvio=timezone.now()
+            )
+            return JsonResponse({'status': 'ok'})
+            
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'status': 'error'}, status=400)
 
 def api_lista_usuarios_chat(request):
     usuarios_qs = Usuario.objects.exclude(tipoUsuario__nombre='Administrador')
@@ -389,10 +506,10 @@ def api_lista_usuarios_chat(request):
     return JsonResponse(data, safe=False)
 
 def cuenta(request):
-    return render(request, 'psicologos/cuenta.html')
+    return render(request, 'psicologos/psicologo.html')
 
 def agendas(request):
-    return render(request, 'psicologos/agendas.html')
+    return render(request, 'psicologos/psicologo.html')
 
 #Admin
 @login_required
@@ -682,6 +799,7 @@ def guardar_horario(request):
             return JsonResponse({'success': False, 'error': str(e)})
 
 def tu_vista_admin(request):
+
     # 1. Traemos los datos de la base de datos
     horarios_qs = Horario.objects.all()
     
@@ -693,3 +811,271 @@ def tu_vista_admin(request):
         # ... tus otros datos ...
     }
     return render(request, 'admin.html', context)
+
+#flutter
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@csrf_exempt
+def api_login(request):
+    if request.method == 'POST':
+        # Flutter envía JSON, así que lo leemos así:
+        try:
+            data = json.loads(request.body)
+            correo_login = data.get('correo')
+            password_login = data.get('password')
+        except:
+            # Si mandas los datos como Form Data en lugar de JSON
+            correo_login = request.POST.get('correo')
+            password_login = request.POST.get('password')
+
+        user = authenticate(request, username=correo_login, password=password_login)
+
+        if user is not None:
+            estado = getattr(user.estadoCuenta, 'nombre', user.estadoCuenta)
+            
+            if str(estado).lower() != 'activo':
+                return JsonResponse({'error': 'Cuenta inactiva'}, status=403)
+
+            # En lugar de auth_login (que es para sesiones de navegador), 
+            # simplemente devolvemos los datos del usuario.
+            return JsonResponse({
+                'token': 'session_token_temporal', # Aquí luego pondremos un JWT real
+                'user': {
+                    'numero': user.numero,
+                    'nombrePila': user.nombrePila,
+                    'primerApellido': user.primerApellido,
+                    'segundoApellido': user.segundoApellido,
+                    'correo': user.correo,
+                    'tipoUsuario': user.tipoUsuario_id,
+                    'genero': user.genero,
+                }
+            }, status=200)
+        else:
+            return JsonResponse({'error': 'Credenciales inválidas'}, status=401)
+            
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+@csrf_exempt
+def api_registro_paciente(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            
+            # Validación rápida de campos obligatorios
+            if not data.get('fecha_nacimiento'):
+                return JsonResponse({'error': 'La fecha de nacimiento es obligatoria'}, status=400)
+
+            with transaction.atomic():
+                # 1. Obtenemos las llaves foráneas necesarias
+                # Asegúrate de que los nombres coincidan exactamente con tu BD
+                tipo_paciente = TipoUsuario.objects.get(clave=1)
+                estado_activo = EdoCuenta.objects.get(nombre__icontains='Activo') 
+                
+                # 2. Crear el Usuario
+                usuario = Usuario.objects.create(
+                    nombrePila=data.get('nombre'),
+                    primerApellido=data.get('primer_apellido'),
+                    segundoApellido=data.get('segundo_apellido', ''),
+                    genero=data.get('genero'),
+                    correo=data.get('correo'),
+                    password=make_password(data.get('password')),
+                    tipoUsuario=tipo_paciente,
+                    estadoCuenta=estado_activo
+                )
+
+                # 3. Crear el registro de Paciente con la FECHA
+                Paciente.objects.create(
+                    usuario=usuario,
+                    fechaNacimiento=data.get('fecha_nacimiento') # Formato YYYY-MM-DD
+                )
+
+                # 4. Crear el Teléfono
+                telefono_data = data.get('telefono')
+                if telefono_data:
+                    Telefono.objects.create(
+                        numTel=telefono_data,
+                        usuario=usuario
+                    )
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Registro exitoso y cuenta activa'
+            }, status=201)
+
+        except TipoUsuario.DoesNotExist:
+            return JsonResponse({'error': 'Error de configuración: Tipo de usuario no encontrado'}, status=500)
+        except EdoCuenta.DoesNotExist:
+            return JsonResponse({'error': 'Error de configuración: Estado de cuenta "Activo" no encontrado'}, status=500)
+        except Exception as e:
+            # Imprime el error en la consola de Django para debuguear mejor
+            print(f"Error en registro: {e}")
+            return JsonResponse({'error': str(e)}, status=400)
+
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+@csrf_exempt
+@require_POST
+@login_required
+def registrar_consulta_api(request):
+    try:
+        cita_id = request.POST.get('cita_id')
+        notas = request.POST.get('notas')
+        diagnostico = request.POST.get('diagnostico')
+        
+        # 1. Buscamos la cita
+        from .models import Cita, Consulta, EdoCita
+        cita = get_object_or_404(Cita, numero=cita_id)
+        
+        # 2. Creamos el registro de la Consulta
+        Consulta.objects.create(
+            cita=cita,
+            notas=notas,
+            diagnostico=diagnostico
+        )
+        
+        # 3. Cambiamos el estado de la cita a 'Finalizada'
+        # Asegúrate de que el nombre 'Finalizada' exista en tu tabla EdoCita
+        estado_fin, _ = EdoCita.objects.get_or_create(nombre='Finalizada')
+        cita.estado = estado_fin
+        cita.save()
+        
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@api_view(['GET'])
+def api_lista_pacientes_detallada(request):
+    pacientes = Paciente.objects.all()
+    data = []
+    for p in pacientes:
+        # Intentamos obtener la URL, si no, mandamos un string vacío 
+        # para que el 'onerror' del JS entre en acción
+        try:
+            foto_path = p.foto.url if p.foto else '/media/perfiles/default.png'
+        except:
+            foto_path = '/media/perfiles/default.png'
+
+        data.append({
+            "id": p.usuario.numero,
+            "nombre": f"{p.usuario.nombrePila} {p.usuario.primerApellido}",
+            "correo": p.usuario.correo,
+            "telefono": getattr(p, 'telefono', 'Sin teléfono'),
+            "genero": getattr(p, 'genero', 'No especificado'),
+            "edad": getattr(p, 'edad', 'N/A'),
+            "foto": foto_path 
+        })
+    return Response(data)
+
+def obtener_o_crear_conversacion(user1, user2_id):
+    # Buscamos una conversación donde participen exactamente ambos usuarios
+    conversaciones_user1 = ConvUsuario.objects.filter(usuario=user1).values_list('conversacion', flat=True)
+    
+    # Buscamos si el usuario2 está en alguna de esas conversaciones
+    conv_comun = ConvUsuario.objects.filter(
+        conversacion__in=conversaciones_user1, 
+        usuario_id=user2_id
+    ).first()
+
+    if conv_comun:
+        return conv_comun.conversacion
+    else:
+        # Si no existe, la creamos
+        nueva_conv = Conversacion.objects.create(fechaInicio=timezone.now())
+        ConvUsuario.objects.create(conversacion=nueva_conv, usuario=user1)
+        ConvUsuario.objects.create(conversacion=nueva_conv, usuario_id=user2_id)
+        return nueva_conv
+
+def guardar_consulta(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            
+            # 1. Obtener la Cita (Usando 'numero' como PK según tu esquema)
+            cita = Cita.objects.get(numero=data['cita_id'])
+            
+            # 2. Actualizar estado de la cita
+            # IMPORTANTE: Asegúrate de que el nombre 'Atendida' coincida con tu DB
+            nuevo_estado = EdoCita.objects.filter(nombre__icontains='Atendida').first()
+            if nuevo_estado:
+                cita.estado = nuevo_estado
+                cita.save()
+
+            # 3. Crear Consulta (según tu imagen: numero, notas, diagnostico, cita_id)
+            # Dejamos que 'numero' se autogenere (AutoField)
+            nueva_consulta = Consulta.objects.create(
+                notas=data['notas'],
+                diagnostico=data['diagnostico'],
+                cita=cita # Django vincula cita_id automáticamente
+            )
+
+            # 4. Crear Sesión (según tu imagen: numero, numSesion, observaciones, consulta_id)
+            conteo_previo = Sesion.objects.filter(consulta__cita__paciente=cita.paciente).count()
+            Sesion.objects.create(
+                numSesion=conteo_previo + 1,
+                observaciones=data['observaciones'],
+                consulta=nueva_consulta # Django vincula consulta_id automáticamente
+            )
+
+            # 5. Crear Pago (según tu imagen: codigo, fecha, hora, monto, consulta_id)
+            Pago.objects.create(
+                fecha=timezone.now().date(),
+                hora=timezone.now().time(),
+                monto=data['monto'],
+                consulta=nueva_consulta
+            )
+
+            return JsonResponse({'status': 'ok'})
+
+        except Exception as e:
+            # Esto imprimirá el error exacto en tu consola de Python
+            print("ERROR DETECTADO:", str(e)) 
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+    return JsonResponse({'status': 'error', 'message': 'Solo POST'}, status=405)
+
+@login_required
+def panel_psicologos(request):
+    try:
+        psicologo = Psicologo.objects.get(usuario=request.user)
+    except Psicologo.DoesNotExist:
+        messages.error(request, "No tienes perfil de psicólogo asignado.")
+        return redirect('/')
+
+    hoy = timezone.now().date()
+    
+    # --- DATOS EXISTENTES ---
+    citas_hoy_count = Cita.objects.filter(psicologo=psicologo, fecha=hoy).count()
+    pacientes_activos = Paciente.objects.filter(cita__psicologo=psicologo).distinct().count()
+    
+    citas_pendientes = Cita.objects.filter(
+        psicologo=psicologo, 
+        estado__nombre='Pendiente' 
+    ).order_by('fecha', 'hora')
+
+    todas_las_citas = Cita.objects.filter(psicologo=psicologo).order_by('-fecha')
+    telefono_obj = Telefono.objects.filter(usuario=request.user).first()
+
+    # --- NUEVOS DATOS PARA HISTORIALES ---
+    # 1. Historial de Consultas (solo las de este psicólogo)
+    consultas_historial = Consulta.objects.filter(
+        cita__psicologo=psicologo
+    ).select_related('cita', 'cita__paciente__usuario').order_by('-cita__fecha')
+
+    # 2. Historial de Pagos (solo los de las consultas de este psicólogo)
+    pagos_historial = Pago.objects.filter(
+        consulta__cita__psicologo=psicologo
+    ).select_related('consulta__cita__paciente__usuario').order_by('-fecha', '-hora')
+
+    contexto = {
+        'psicologo': psicologo,
+        'citas_hoy': citas_hoy_count,
+        'pacientes_activos': pacientes_activos,
+        'citas': citas_pendientes,
+        'agendas': todas_las_citas,
+        'consultas': consultas_historial, # Clave para el HTML
+        'pagos': pagos_historial,         # Clave para el HTML
+        'telefono': telefono_obj.numTel if telefono_obj else "",
+    }
+    return render(request, 'psicologos/psicologo.html', contexto)

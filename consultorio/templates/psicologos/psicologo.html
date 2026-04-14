@@ -1,0 +1,367 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Psicólogo - FYM</title>
+    <link rel="stylesheet" href="{% static 'css/psicologos.css' %}">
+    <style>
+        .section { display: none; }
+        .section.active { display: block; }
+        .account-form input[readonly] { background-color: #f8fafc; color: #64748b; cursor: not-allowed; }
+        .active-user { background-color: #e2e8f0; border-left: 4px solid #3b82f6; }
+        .message.sent { text-align: right; background: #dcf8c6; margin-left: 20%; border-radius: 10px 10px 0 10px; padding: 8px; margin-bottom: 5px; }
+        .message.received { text-align: left; background: #fff; margin-right: 20%; border-radius: 10px 10px 10px 0; padding: 8px; margin-bottom: 5px; border: 1px solid #ddd; }
+    </style>
+</head>
+
+<body>
+    {% csrf_token %}
+    <div class="layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2 class="logo">FYM</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li>
+                        <a href="#" class="menu active" onclick="showSection('panel', this)">
+                            <span class="icon">⊞</span> Panel principal
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="menu" onclick="showSection('agendas', this)">
+                            <span class="icon">📅</span> Agendas
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="menu" onclick="showSection('mensajes', this)">
+                            <span class="icon">💬</span> Mensajes
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="menu" onclick="showSection('pacientes', this)">
+                            <span class="icon">👥</span> Pacientes
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="menu" onclick="showSection('consultas', this)">
+                            <span class="icon">📋</span> Historial Consultas
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="menu" onclick="showSection('pagos', this)">
+                            <span class="icon">💵</span> Facturas y Pagos
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="menu" onclick="showSection('cuenta', this)">
+                            <span class="icon">👤</span> Cuenta
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="{% url 'logout' %}" class="menu logout-btn">
+                    <span class="icon">🚪</span> Cerrar sesión
+                </a>
+            </div>
+        </aside>
+
+        <main class="main">
+            <section id="panel" class="section active">
+                <div class="topbar">
+                    <h1>Bienvenido, Dr. {{ psicologo.usuario.nombrePila }}</h1>
+                    <span class="user">{{ psicologo.usuario.nombrePila }} {{ psicologo.usuario.primerApellido }}</span>
+                </div>
+
+                <div class="stats">
+                    <div class="card-stat">
+                        <p>Citas hoy</p>
+                        <h2>{{ citas_hoy }}</h2>
+                    </div>
+                    <div class="card-stat">
+                        <p>Pacientes activos</p>
+                        <h2>{{ pacientes_activos }}</h2>
+                    </div>
+                </div>
+
+                <div class="table-section">
+                    <h3>Citas próximas para hoy</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Hora</th>
+                                <th>Paciente</th>
+                                <th>Motivo</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cita in citas %}
+                            <tr>
+                                <td>{{ cita.hora|time:"h:i A" }}</td>
+                                <td>{{ cita.paciente.usuario.nombrePila }} {{ cita.paciente.usuario.primerApellido }}</td>
+                                <td>{{ cita.motivo }}</td>
+                                <td>
+                                    <button class="btn-save" style="padding: 5px 10px;" 
+                                        onclick="abrirModalConsulta('{{ cita.numero }}', '{{ cita.paciente.usuario.nombrePila }}')">
+                                        Atender
+                                    </button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" style="text-align:center;">No hay citas pendientes para hoy.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="agendas" class="section">
+                <h1>Historial de Agendas</h1>
+                <div class="table-section">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                                <th>Paciente</th>
+                                <th>Estado</th>
+                                <th>Acciones</th> </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in agendas %}
+                            <tr>
+                                <td>{{ item.fecha|date:"d/m/Y" }}</td>
+                                <td>{{ item.hora|time:"h:i A" }}</td>
+                                <td>{{ item.paciente.usuario.nombrePila }} {{ item.paciente.usuario.primerApellido }}</td>
+                                <td><span class="badge {{ item.estado.nombre|lower }}">{{ item.estado.nombre }}</span></td>
+                                <td>
+                                    {% if item.estado.nombre == "Pendiente" %}
+                                    <button onclick="abrirModalConsulta('{{ item.numero }}', '{{ item.paciente.usuario.nombrePila }}')" class="btn-atender">
+                                        Atender
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+
+                        <div id="modalConsulta" class="modal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
+                            <div class="modal-content" style="background:white; margin:10% auto; padding:20px; width:50%; border-radius:8px;">
+                                <h2 id="modal-titulo">Atender Consulta</h2>
+                                <form id="formConsulta">
+                                    <input type="hidden" id="cita_id">
+                                    <label>Notas:</label>
+                                    <textarea id="notas" style="width:100%; height:80px; margin-bottom:10px;"></textarea>
+                                    
+                                    <label>Diagnóstico:</label>
+                                    <textarea id="diagnostico" style="width:100%; height:80px; margin-bottom:10px;"></textarea>
+                                    
+                                    <label>Observaciones de Sesión:</label>
+                                    <textarea id="observaciones" style="width:100%; height:80px; margin-bottom:10px;"></textarea>
+                                    
+                                    <label>Monto del Pago ($):</label>
+                                    <input type="number" id="monto" value="500" style="width:100%; margin-bottom:20px;">
+                                    
+                                    <div style="text-align:right;">
+                                        <button type="button" onclick="cerrarModal()" style="background:#6c757d; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">Cancelar</button>
+                                        <button type="submit" style="background:#3b82f6; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">Guardar Consulta</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </table>
+                </div>
+            </section>
+
+            <section id="mensajes" class="section">
+                <style>
+                    /* Contenedor de las burbujas */
+                    #contenedor-mensajes {
+                        display: flex;
+                        flex-direction: column; /* Alinea los hijos uno debajo de otro */
+                        gap: 10px;
+                        padding: 20px;
+                        background: #fafafa;
+                        flex: 1;
+                        overflow-y: auto;
+                    }
+
+                    /* Estilo base de todas las burbujas */
+                    .message {
+                        max-width: 70%; /* Evita que se estire a todo lo ancho */
+                        padding: 10px 15px;
+                        border-radius: 15px;
+                        font-size: 14px;
+                        line-height: 1.4;
+                        word-wrap: break-word;
+                        margin-bottom: 5px;
+                    }
+
+                    /* burbuja AZUL para lo que tú envías */
+                    .message.sent {
+                        align-self: flex-end; /* Empuja a la derecha */
+                        background-color: #3b82f6; /* El azul de tu botón Enviar */
+                        color: white;
+                        border-bottom-right-radius: 2px; /* Punta de chat */
+                    }
+
+                    /* burbuja GRIS para lo que recibes */
+                    .message.received {
+                        align-self: flex-start; /* Empuja a la izquierda */
+                        background-color: #e5e7eb;
+                        color: #1f2937;
+                        border-bottom-left-radius: 2px;
+                    }
+
+                    /* Lista lateral de pacientes */
+                    .user-item {
+                        padding: 12px;
+                        border-bottom: 1px solid #eee;
+                        cursor: pointer;
+                        transition: background 0.2s;
+                    }
+                    .user-item:hover {
+                        background: #f1f5f9;
+                    }
+                </style>
+
+                <div class="chat-layout" style="display: flex; height: 80vh; gap: 20px;">
+                    <div class="chat-users" style="flex: 1; border-right: 1px solid #ddd; overflow-y: auto; background: white; border-radius: 8px;">
+                        <h3 style="padding: 15px; border-bottom: 1px solid #eee; margin: 0;">Pacientes</h3>
+                        <ul id="lista-usuarios-chat" style="list-style: none; padding: 0; margin: 0;">
+                            </ul>
+                    </div>
+
+                    <div class="chat-box" style="flex: 3; display: flex; flex-direction: column; background: white; border-radius: 8px; border: 1px solid #eee; overflow: hidden;">
+                        <div class="chat-header" id="chat-header-nombre" style="padding: 15px; background: #f1f5f9; font-weight: bold; border-bottom: 1px solid #ddd;">
+                            Selecciona un chat para comenzar
+                        </div>
+                        
+                        <div id="contenedor-mensajes">
+                            </div>
+
+                        <div class="chat-input" style="padding: 15px; display: flex; gap: 10px; background: white; border-top: 1px solid #eee;">
+                            {% csrf_token %}
+                            <input type="text" id="input-mensaje" placeholder="Escribe un mensaje..." style="flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
+                            <button onclick="enviarMensaje()" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Enviar</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section id="pacientes" class="section">
+                <div class="top-header">
+                    <h1>Mis pacientes</h1>
+                    <div class="search-container">
+                        <input type="text" id="search-input" placeholder="Buscar paciente..." onkeyup="filtrarPacientes()">
+                        <button class="btn-search">Buscar</button>
+                    </div>
+                </div>
+
+                <div class="patients-grid" id="patients-grid">
+                    </div>
+            </section>
+            <section id="consultas" class="section" style="display:none;">
+                <h1>Historial de Consultas Médicas</h1>
+                <div class="table-section shadow">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Paciente</th>
+                                <th>Notas</th>
+                                <th>Diagnóstico</th>
+                                <th>Sesión N°</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-consultas-body">
+                            {% for consulta in consultas %}
+                            <tr>
+                                <td>{{ consulta.cita.fecha|date:"d/m/Y" }}</td>
+                                <td>{{ consulta.cita.paciente.usuario.nombrePila }} {{ consulta.cita.paciente.usuario.primerApellido }}</td>
+                                <td>{{ consulta.notas|truncatechars:30 }}</td>
+                                <td><strong>{{ consulta.diagnostico }}</strong></td>
+                                <td>
+                                    {% for sesion in consulta.sesion_set.all %}
+                                        {{ sesion.numSesion }}
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="pagos" class="section" style="display:none;">
+                <h1>Historial de Pagos y Facturación</h1>
+                <div class="table-section shadow">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Fecha / Hora</th>
+                                <th>Paciente</th>
+                                <th>Monto</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pago in pagos %}
+                            <tr>
+                                <td>#{{ pago.codigo }}</td>
+                                <td>{{ pago.fecha|date:"d/m/Y" }} - {{ pago.hora|time:"h:i A" }}</td>
+                                <td>{{ pago.consulta.cita.paciente.usuario.nombrePila }}</td>
+                                <td style="color: #2e7d32; font-weight: bold;">${{ pago.monto }}</td>
+                                <td><span class="badge" style="background: #e8f5e9; color: #2e7d32;">Pagado</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            <section id="cuenta" class="section">
+                <div class="account-section">
+                    <h3>Información de la Cuenta</h3>
+                    <form class="account-form">
+                        <label>Nombre Completo</label>
+                        <input type="text" value="{{ psicologo.usuario.nombrePila }} {{ psicologo.usuario.primerApellido }} {{ psicologo.usuario.segundoApellido }}" readonly>
+                        
+                        <label>Correo Electrónico</label>
+                        <input type="email" value="{{ psicologo.usuario.correo }}" readonly>
+                        
+                        <label>Teléfono de contacto</label>
+                        <input type="text" id="perfilTelefono" value="{{ telefono }}" placeholder="Teléfono">
+                        
+                        <label>Cédula Profesional</label>
+                        <input type="text" value="{{ psicologo.cedula }}" readonly>
+
+                        <div class="account-buttons" style="margin-top: 20px;">
+                            <button type="button" class="btn-save" onclick="actualizarTelefonoPsicologo()">Actualizar Teléfono</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Definir ID del psicólogo para que paciente.js lo use
+        const PROFESIONAL_ID = "{{ psicologo.usuario.numero }}";
+
+        // Función para cambiar de sección visualmente
+        function showSection(sectionId, element) {
+            document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+            document.querySelectorAll('.menu').forEach(menu => menu.classList.remove('active'));
+            if(element) element.classList.add('active');
+        }
+    </script>
+    <script src="{% static 'js/psicologo.js' %}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</body>
+</html>

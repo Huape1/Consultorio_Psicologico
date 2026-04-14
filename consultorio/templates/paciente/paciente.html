@@ -1,155 +1,150 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Free You Mind</title>
-
-<link rel="stylesheet" href="{% static 'css/paciente.css' %}">
-
+    <meta charset="UTF-8">
+    <title>FYM - Panel de Paciente</title>
+    <link rel="stylesheet" href="{% static 'css/paciente.css' %}">
+    <style>
+        body { display: flex !important; margin: 0; padding: 0; background: #f5f7fb; min-height: 100vh; }
+        .sidebar { 
+            width: 260px !important; 
+            background: #0bafe5 !important; 
+            height: 100vh; 
+            position: fixed; 
+            left: 0 !important; 
+            top: 0; 
+            color: white; 
+            padding: 20px; 
+            z-index: 9999;
+            display: block !important;
+        }
+        .content { 
+            margin-left: 260px !important; 
+            padding: 40px; 
+            flex: 1; 
+            width: calc(100% - 260px);
+        }
+        .menu a { 
+            display: block; 
+            color: white !important; 
+            padding: 15px; 
+            text-decoration: none !important; 
+            cursor: pointer; 
+            margin-bottom: 5px;
+            border-radius: 8px;
+        }
+        .menu a:hover { background: rgba(255,255,255,0.2); }
+        .section { display: none; }
+        .section.active { display: block !important; }
+        .logo { font-size: 24px; font-weight: bold; margin-bottom: 30px; text-align: center; }
+    </style>
 </head>
-
 <body>
 
-<button class="menu-btn" onclick="toggleMenu()">☰</button>
+    <nav class="sidebar">
+        <div class="logo" style="font-size: 22px; font-weight: bold; margin-bottom: 30px; text-align: center;">Free You Mind</div>
+        <div class="menu">
+            <a onclick="showSection('inicio')">🏠 Inicio</a>
+            <a onclick="showSection('agendar')">📅 Agendar Cita</a>
+            <a onclick="showSection('misCitas')">📑 Mis Citas</a>
+            <a onclick="showSection('mensajes')">💬 Mensajes</a>
+            <a onclick="showSection('perfil')">👤 Perfil</a>
+            <a href="{% url 'logout' %}" style="margin-top: 20px; color: #ffeb3b;">🚪 Cerrar Sesión</a>
+        </div>
+    </nav>
 
-<div class="sidebar" id="sidebar">
+    <main class="content">
+        <header style="margin-bottom: 30px;">
+            <h1>Hola, {{ user.nombrePila }} 👋</h1>
+            {% if messages %}
+                {% for message in messages %}
+                    <div style="padding: 10px; background: #d4edda; color: #155724; border-radius: 5px; margin-bottom: 10px;">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        </header>
 
-<button class="menu-btn" onclick="toggleMenu()">☰</button>
+        <section id="inicio" class="section active">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="card">
+                    <h3>Próxima Cita</h3>
+                    <p style="font-size: 20px; color: #0bafe5; font-weight: bold;">
+                        {% if proxima_cita %}{{ proxima_cita.fecha }} - {{ proxima_cita.hora }}{% else %}No hay citas programadas{% endif %}
+                    </p>
+                </div>
+                <div class="card">
+                    <h3>Sesiones Completadas</h3>
+                    <p style="font-size: 24px; font-weight: bold;">{{ conteo_sesiones }}</p>
+                </div>
+            </div>
+        </section>
 
-<div class="logo">Free You Mind</div>
+        <section id="agendar" class="section">
+            <div class="card" style="max-width: 500px;">
+                <h2>Agendar Nueva Cita</h2>
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="agendar_cita">
+                    
+                    <label>Psicólogo:</label>
+                    <select name="psicologo_id" required style="width: 100%; padding: 10px; margin: 10px 0;">
+                        {% for psi in psicologos %}
+                            <option value="{{ psi.numero }}">Dr. {{ psi.usuario.nombrePila }}</option>
+                        {% endfor %}
+                    </select>
 
-<div class="menu">
-<a onclick="showSection('inicio')"><strong>Inicio</strong></a>
-<a onclick="showSection('agendar')"><strong>Agendar Cita</strong></a>
-<a onclick="showSection('misCitas')"><strong>Mis Citas</strong></a>
-<a onclick="showSection('historial')"><strong>Historial</strong></a>
-<a onclick="showSection('mensajes')"><strong>Mensajes</strong></a>
-<a onclick="showSection('perfil')"><strong>Perfil</strong></a>
-<a onclick="openModal()"><strong>Cerrar Sesión</strong></a>
-</div>
+                    <label>Fecha:</label>
+                    <input type="date" name="fecha" required style="width: 100%; padding: 10px; margin: 10px 0;">
 
-</div>
+                    <label>Hora:</label>
+                    <input type="time" name="hora" required style="width: 100%; padding: 10px; margin: 10px 0;">
 
-<div class="content">
+                    <label>Modalidad:</label>
+                    <select name="modalidad_nombre" style="width: 100%; padding: 10px; margin: 10px 0;">
+                        <option value="Virtual">Virtual</option>
+                        <option value="Presencial">Presencial</option>
+                    </select>
 
-<div id="inicio" class="section active">
+                    <button type="submit" style="background: #0bafe5; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold;">Confirmar Cita</button>
+                </form>
+            </div>
+        </section>
 
-<h1 id="bienvenida"></h1>
+        <section id="mensajes" class="section">
+            <div class="card">
+                <h2>Chat con tu Psicólogo</h2>
+                <div id="chat-box" style="height: 300px; border: 1px solid #eee; border-radius: 8px; margin: 15px 0; padding: 15px; overflow-y: auto; background: #fafafa;">
+                    <p style="color: #888; text-align: center;">Inicia una conversación...</p>
+                </div>
+                <form method="POST" style="display: flex; gap: 10px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="enviar_mensaje">
+                    <input type="text" name="mensaje" placeholder="Escribe aquí..." required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                    <button type="submit" style="background: #0bafe5; color: white; border: none; padding: 10px 20px; border-radius: 8px;">Enviar</button>
+                </form>
+            </div>
+        </section>
 
-<div class="cards">
+        <section id="misCitas" class="section">
+            <h2>Historial de Citas</h2>
+            {% for cita in citas %}
+                <div class="box">
+                    <span><strong>{{ cita.fecha }}</strong> - {{ cita.hora }}</span>
+                    <span>Dr. {{ cita.psicologo.usuario.nombrePila }}</span>
+                    <span style="color: #0bafe5;">{{ cita.estado.nombre }}</span>
+                </div>
+            {% empty %}
+                <p>No tienes citas registradas.</p>
+            {% endfor %}
+        </section>
 
-<div class="card">
-<h3>Próxima Cita</h3>
-<p id="proximaCita">--</p>
-</div>
+    </main>
 
-<div class="card">
-<h3>Sesiones</h3>
-<p id="sesiones">0</p>
-</div>
-
-<div class="card">
-<h3>Mensajes</h3>
-<p id="contadorMensajes">0</p>
-</div>
-
-</div>
-
-<button onclick="showSection('agendar')"><strong>Agendar Cita</strong></button>
-
-<div class="foto-perfil">
-<label for="foto">
-<img id="preview" src="{% static 'img/perfil.png' %}" class="foto-preview">
-</label>
-
-<input type="file" id="foto" accept="image/*" onchange="mostrarImagen(event)">
-</div>
-
-</div>
-
-<div id="agendar" class="section">
-
-<h1>Agendar Cita</h1>
-
-<select id="doctor">
-<option>Dra. Maria Ester</option>
-<option>Dr. Juan Carlos Rico</option>
-</select>
-
-<input type="date" id="fecha">
-<input type="time" id="hora">
-
-<select id="tipo">
-<option>Virtual</option>
-<option>Presencial</option>
-</select>
-
-<button onclick="confirmarCita()">Confirmar Cita</button>
-
-</div>
-
-<div id="misCitas" class="section">
-
-<h1>Mis Citas</h1>
-
-<div id="listaCitas"></div>
-
-</div>
-
-<div id="historial" class="section">
-
-<h1>Historial</h1>
-
-<div class="box">10 Marzo 2026 - Virtual</div>
-
-</div>
-
-<div id="mensajes" class="section">
-
-<h1>Mensajes</h1>
-
-<div id="listaMensajes"></div>
-
-<textarea id="mensajeTexto" placeholder="Escribe un mensaje"></textarea>
-
-<button onclick="enviarMensaje()">Enviar</button>
-<button onclick="limpiarDatos()">Eliminar todo</button>
-</div>
-
-<div id="perfil" class="section">
-
-<h1>Perfil</h1>
-
-<input type="text" id="perfilNombre">
-<input type="email" id="perfilEmail">
-
-<button onclick="guardarCambios()">Guardar Cambios</button>
-
-</div>
-
-</div>
-
-<div id="logoutModal" class="modal">
-
-<div class="modal-content">
-
-<h2>¿Cerrar sesión?</h2>
-
-<div class="modal-buttons">
-
-<button class="cancel-btn" onclick="closeModal()">Cancelar</button>
-<button class="confirm-btn" onclick="cerrarSesion()">Cerrar</button>
-
-</div>
-
-</div>
-
-</div>
-
-<script src="{% static 'js/paciente.js' %}"></script>
-
+    <script>
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+    </script>
 </body>
 </html>

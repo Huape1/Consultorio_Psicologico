@@ -24,4 +24,5 @@ urlpatterns = [
     path('', include('consultorio.urls')),
     path('register/', include('consultorio.urls')),
     path('login/', include('consultorio.urls')),
+    path('api/', include('consultorio.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
