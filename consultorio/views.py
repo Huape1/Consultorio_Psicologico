@@ -2,7 +2,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from zoneinfo import ZoneInfo
-from datetime import datetime, date
+import datetime  
+from datetime import date, timedelta
+from datetime import datetime as dt
 from django.db import transaction
 from django.contrib.auth import logout
 from django.contrib.auth import authenticate, login as auth_login
@@ -1033,27 +1035,41 @@ def paciente(request):
         
         # A. AGENDAR CITA
         if action == 'agendar_cita':
+            # PRIMERO: Obtenemos los datos del formulario
             psi_id = request.POST.get('psicologo_id')
             fecha = request.POST.get('fecha')
             hora = request.POST.get('hora')
             mod_nombre = request.POST.get('modalidad_nombre')
-            
+
+            # SEGUNDO: Validaciones de fecha
+            try:
+                fecha_cita = datetime.datetime.strptime(fecha, "%Y-%m-%d").date()
+                hoy = date.today()
+
+                if fecha_cita <= hoy:
+                    messages.error(request, "La cita debe ser programada al menos con un día de anticipación.")
+                    return redirect('/paciente/')
+
+                if fecha_cita > hoy + timedelta(days=180):
+                    messages.error(request, "No puedes agendar citas con más de 6 meses de anticipación.")
+                    return redirect('/paciente/')
+            except (ValueError, TypeError):
+                messages.error(request, "Fecha inválida.")
+                return redirect('/paciente/')
+
+            # TERCERO: Lógica de creación (el resto de tu código)
             psicologo = get_object_or_404(Psicologo, numero=psi_id)
             modalidad, _ = Modalidad.objects.get_or_create(nombre=mod_nombre or 'Virtual')
             estado_pend, _ = EdoCita.objects.get_or_create(nombre='Pendiente')
-            
-            servicio = Servicio.objects.first()
-            if not servicio:
-                servicio = Servicio.objects.create(
-                    nombre="Consulta General", 
-                    descripcion="Sesión estándar",
-                    precio=0
-                )
+            motivo_escrito = request.POST.get('motivo', 'Consulta')
+            # Buscamos el servicio específico que seleccionó el usuario
+            servicio_id = request.POST.get('servicio_id')
+            servicio = get_object_or_404(Servicio, clave=servicio_id)
 
             Cita.objects.create(
                 fecha=fecha, 
                 hora=hora, 
-                motivo="Consulta",
+                motivo=motivo_escrito,
                 psicologo=psicologo, 
                 paciente=paciente_instancia,
                 servicio=servicio, 
@@ -1061,6 +1077,7 @@ def paciente(request):
                 estado=estado_pend
             )
             messages.success(request, "¡Cita agendada correctamente!")
+            return redirect('/paciente/') # Siempre haz redirect tras un POST exitoso
         elif action == 'cancelar_cita':
             cita_id = request.POST.get('cita_id')
             # Buscamos la cita asegurándonos de que pertenezca al paciente actual
@@ -1200,64 +1217,67 @@ def enviar_mensaje_paciente(request):
         return JsonResponse({'status': 'ok'})
     return JsonResponse({'status': 'error'}, status=400)
 
-import datetime
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
-
 def api_psicologos_disponibles(request):
-    servicio_id = request.GET.get('servicio')
-    hora_str = request.GET.get('hora')
-    fecha_str = request.GET.get('fecha') # "2026-04-13"
-
-    if not all([servicio_id, hora_str, fecha_str]):
-        return JsonResponse([], safe=False)
-
     try:
-        # 1. Obtener la hora y el nombre del día de la fecha seleccionada
-        hora_input = datetime.datetime.strptime(hora_str, "%H:%M").time()
-        fecha_obj = datetime.datetime.strptime(fecha_str, "%Y-%m-%d")
+        servicio_id = request.GET.get('servicio')
+        hora_str = request.GET.get('hora')
+        fecha_str = request.GET.get('fecha')
+
+        if not all([servicio_id, hora_str, fecha_str]):
+            return JsonResponse([], safe=False)
+
+        hora_input = dt.strptime(hora_str, "%H:%M").time()
+        fecha_obj = dt.strptime(fecha_str, "%Y-%m-%d")
         
-        # Mapeo de días de Python a tu formato de DB (Español con tildes)
-        dias_map = {
-            0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 
-            3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'
-        }
+        # 1. Obtener psicólogos que YA tienen cita a esa hora y fecha
+        # Excluimos las que están 'Cancelada' para que el psicólogo vuelva a estar libre
+        psicologos_ocupados_ids = Cita.objects.filter(
+            fecha=fecha_obj.date(),
+            hora=hora_input
+        ).exclude(estado__nombre='Cancelada').values_list('psicologo_id', flat=True)
+
+        # 2. Obtener el servicio y los psicólogos de esa especialidad
+        servicio = get_object_or_404(Servicio, clave=servicio_id)
+        
+        # 3. Filtramos: que sean de la especialidad Y NO estén en la lista de ocupados
+        psicologos = Psicologo.objects.filter(
+            especialidad=servicio.especialidad
+        ).exclude(
+            numero__in=psicologos_ocupados_ids # Excluir ocupados
+        ).select_related('usuario')
+        
+        dias_map = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
         nombre_dia_selec = dias_map[fecha_obj.weekday()]
 
-        servicio = get_object_or_404(Servicio, clave=servicio_id)
-        psicologos = Psicologo.objects.filter(especialidad=servicio.especialidad)
-        
         disponibles = []
 
         for psi in psicologos:
-            turnos = HorPsicologo.objects.filter(psicologo=psi)
+            turnos = HorPsicologo.objects.filter(psicologo=psi).select_related('horario')
             for t in turnos:
-                # 2. Validar si el día coincide
-                # Buscamos si "Miércoles" está dentro de "Lunes, Martes, Miércoles..."
-                if nombre_dia_selec not in t.horario.dias:
+                if not t.horario or nombre_dia_selec not in t.horario.dias:
                     continue
 
-                # 3. Validar el rango de horas (Formato 24h: 08:00 - 16:00)
                 try:
                     rango = t.horario.horas.strip()
                     partes = rango.split(' - ')
-                    
-                    # Usamos %H:%M para formato 24 horas
-                    inicio = datetime.datetime.strptime(partes[0].strip(), "%H:%M").time()
-                    fin = datetime.datetime.strptime(partes[1].strip(), "%H:%M").time()
+                    inicio = dt.strptime(partes[0].strip(), "%H:%M").time()
+                    fin = dt.strptime(partes[1].strip(), "%H:%M").time()
 
-                    if inicio <= hora_input <= fin:
+                    if inicio <= hora_input < fin: 
+                        foto_url = "/static/img/default-avatar.png" 
+                        if psi.usuario and psi.usuario.fotoPerfil:
+                            foto_url = psi.usuario.fotoPerfil.url
+                        
                         disponibles.append({
                             "id": psi.numero,
-                            "nombre": psi.usuario.nombrePila,
-                            "foto": psi.usuario.fotoPerfil.url if psi.usuario.fotoPerfil else '/media/perfiles/default.png'
+                            "nombre": psi.usuario.nombrePila if psi.usuario else "Psicólogo",
+                            "foto": foto_url
                         })
-                        break # Ya encontramos que este psicólogo está libre en este turno
-                except Exception as e:
-                    print(f"Error en formato de hora para turno {t.horario.numero}: {e}")
+                        break
+                except:
                     continue
 
         return JsonResponse(disponibles, safe=False)
+
     except Exception as e:
-        print(f"Error general en API: {e}")
-        return JsonResponse([], status=500)
+        return JsonResponse({"error": str(e)}, status=500)

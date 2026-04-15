@@ -691,3 +691,79 @@ button:hover {
     border: 1px solid #ddd;
     border-radius: 5px;
 }
+
+/* Contenedor principal */
+.psicologo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 15px;
+    margin-top: 10px;
+}
+
+/* Escondemos el radio button real pero mantenemos su funcionalidad */
+.psi-card-option input[type="radio"] {
+    display: none;
+}
+
+/* Estilo de la tarjeta */
+.psi-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+    text-align: center;
+}
+
+.psi-info img {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+    border: 2px solid #f1f5f9;
+}
+
+.psi-info span {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+/* Efecto al pasar el mouse */
+.psi-info:hover {
+    border-color: #0bafe5;
+    background: #f0f9ff;
+}
+
+/* Estado seleccionado (cuando el radio oculto está checked) */
+.psi-card-option input[type="radio"]:checked+.psi-info {
+    border-color: #0bafe5;
+    background: #e0f2fe;
+    box-shadow: 0 4px 6px -1px rgba(11, 175, 229, 0.2);
+}
+
+.psi-card-option input[type="radio"]:checked+.psi-info span {
+    color: #0369a1;
+}
+
+#costo-servicio {
+    background-color: #def7fe;
+    /* Usando tu paleta FYM */
+    padding: 8px;
+    border-radius: 5px;
+    display: inline-block;
+    font-size: 0.9em;
+    border-left: 4px solid #0fa3b1;
+}
+
+#step-hora {
+    cursor: pointer;
+    /* Estiliza el select de hora para que no parezca un input normal */
+}
+
+

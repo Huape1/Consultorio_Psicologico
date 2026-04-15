@@ -165,13 +165,19 @@ function validarPaso1() {
     const option = select.options[select.selectedIndex];
     const container2 = document.getElementById('container-paso2');
     const labelGrupal = document.getElementById('label-grupal');
-    
+    const costoDiv = document.getElementById('costo-servicio');
+
     if (select.value) {
+        // Mostrar Costo
+        const precio = option.dataset.precio;
+        costoDiv.innerHTML = `Costo del servicio: $${precio} MXN`;
+
         container2.classList.remove('disabled-step');
-        // Mostrar opción grupal solo si el servicio lo permite
         labelGrupal.style.display = (option.dataset.grupal === 'true') ? 'inline-block' : 'none';
         document.getElementById('cantidad_personas').max = option.dataset.max;
         document.getElementById('container-paso3').classList.remove('disabled-step');
+    } else {
+        costoDiv.innerHTML = "";
     }
 }
 
@@ -196,23 +202,79 @@ function activarPaso5() {
     document.getElementById('container-paso5').classList.remove('disabled-step');
 }
 
+function validarHoraEnPunto() {
+    const horaInput = document.getElementById('step-hora');
+    const valor = horaInput.value; // Ejemplo: "13:57"
+
+    if (valor) {
+        const minutos = valor.split(':')[1];
+        if (minutos !== "00") {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Hora inválida',
+                text: 'Por favor, selecciona una hora en punto (ejemplo: 10:00, 11:00).',
+                confirmButtonColor: '#0FA3B1'
+            });
+            horaInput.value = ""; // Limpiar el campo
+            return;
+        }
+        // Si es válida, buscar psicólogos
+        limpiarYBuscar();
+    }
+}
+
 function limpiarYBuscar() {
     const lista = document.getElementById('lista-psicologos');
     const fechaInput = document.getElementById('step-fecha');
-    const fecha = new Date(fechaInput.value + 'T00:00:00'); // Evitar desfase de zona horaria
-    const diaSemana = fecha.getDay(); // 0 es Domingo, 6 Sábado
 
-    // Ejemplo: Bloquear fines de semana (Sábado=6, Domingo=0)
-    // Deberías ajustar esto según tus modelos de Horario
+    if (!fechaInput.value) return;
+
+    const fecha = new Date(fechaInput.value + 'T00:00:00');
+    const diaSemana = fecha.getDay();
+
+    // Alerta con SweetAlert para fines de semana
     if (diaSemana === 0 || diaSemana === 6) {
-        alert("Lo sentimos, no hay servicios disponibles en fines de semana.");
+        Swal.fire({
+            icon: 'info',
+            title: 'Día no laboral',
+            text: 'Lo sentimos, no contamos con consultas disponibles los fines de semana.',
+            confirmButtonColor: '#0FA3B1'
+        });
         fechaInput.value = "";
+        lista.innerHTML = '<p class="text-muted">Selecciona una fecha válida...</p>';
         return;
     }
 
-    lista.innerHTML = '<p class="text-muted">Buscando doctores disponibles...</p>';
-    fetchPsicologosDisponibles();
+    // Si ya hay hora seleccionada, buscamos
+    const hora = document.getElementById('step-hora').value;
+    if (hora) {
+        lista.innerHTML = '<p class="text-muted">Buscando psicólogos disponibles...</p>';
+        fetchPsicologosDisponibles();
+    }
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    const fechaInput = document.getElementById('step-fecha');
+
+    // Calcular mañana
+    const hoy = new Date();
+    const mañana = new Date(hoy);
+    mañana.setDate(hoy.getDate() + 1);
+
+    // Calcular fecha límite (6 meses adelante)
+    const limite = new Date(hoy);
+    limite.setMonth(hoy.getMonth() + 6);
+
+    // Formatear a YYYY-MM-DD
+    const minStr = mañana.toISOString().split('T')[0];
+    const maxStr = limite.toISOString().split('T')[0];
+
+    fechaInput.min = minStr;
+    fechaInput.max = maxStr;
+
+    // Bloquear escritura manual para obligar a usar el calendario
+    fechaInput.onkeydown = (e) => e.preventDefault();
+});
 
 // En la función fetchPsicologosDisponibles, asegúrate de enviar los datos correctos:
 function fetchPsicologosDisponibles() {
@@ -238,13 +300,13 @@ function fetchPsicologosDisponibles() {
 
             data.forEach(psi => {
                 container.innerHTML += `
-                    <label class="psi-card-option">
-                        <input type="radio" name="psicologo_id" value="${psi.id}" required onclick="activarPaso5()">
-                        <div class="psi-info">
-                            <img src="${psi.foto}" class="avatar-table">
-                            <span>Dr. ${psi.nombre}</span>
-                        </div>
-                    </label>`;
+                <label class="psi-card-option">
+                    <input type="radio" name="psicologo_id" value="${psi.id}" required onclick="activarPaso5()">
+                    <div class="psi-info">
+                        <img src="${psi.foto}" alt="Dr. ${psi.nombre}">
+                        <span>Dr. ${psi.nombre}</span>
+                    </div>
+                </label>`;
             });
         })
         .catch(err => {
