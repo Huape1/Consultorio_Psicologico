@@ -1,3 +1,4 @@
+
 {% load static %}
 <!DOCTYPE html>
 <html lang="es">
@@ -43,27 +44,52 @@
 <body>
 
     <nav class="sidebar">
-        <div class="logo" style="font-size: 22px; font-weight: bold; margin-bottom: 30px; text-align: center;">Free You Mind</div>
+        <div class="logo" style="font-size: 22px; font-weight: bold; margin-bottom: 30px; text-align: center; color: white;">
+            FYM
+        </div>
+
         <div class="menu">
-            <a onclick="showSection('inicio')">🏠 Inicio</a>
-            <a onclick="showSection('agendar')">📅 Agendar Cita</a>
-            <a onclick="showSection('misCitas')">📑 Mis Citas</a>
-            <a onclick="showSection('mensajes')">💬 Mensajes</a>
-            <a onclick="showSection('perfil')">👤 Perfil</a>
-            <a href="{% url 'logout' %}" style="margin-top: 20px; color: #ffeb3b;">🚪 Cerrar Sesión</a>
+            <a onclick="showSection('inicio')" class="nav-item">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span>Inicio</span>
+            </a>
+
+            <a onclick="showSection('agendar')" class="nav-item">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <span>Agendar Cita</span>
+            </a>
+
+            <a onclick="showSection('misCitas')" class="nav-item">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <span>Mis Citas</span>
+            </a>
+
+            <a onclick="showSection('mensajes')" class="nav-item">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                <span>Mensajes</span>
+            </a>
+        </div>
+
+        <div class="sidebar-footer">
+            <a onclick="showSection('perfil')" class="user-info-link">
+                <div class="user-info">
+                    <img src="{{ user.fotoPerfil.url }}" class="user-avatar">
+                    <div class="user-details">
+                        <span class="user-name">{{ user.nombrePila }}</span>
+                        <span class="user-role">Paciente</span>
+                    </div>
+                </div>
+            </a> <a href="{% url 'logout' %}" class="logout-btn" title="Cerrar sesión">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+            </a>
         </div>
     </nav>
 
     <main class="content">
-        <header style="margin-bottom: 30px;">
-            <h1>Hola, {{ user.nombrePila }} 👋</h1>
-            {% if messages %}
-                {% for message in messages %}
-                    <div style="padding: 10px; background: #d4edda; color: #155724; border-radius: 5px; margin-bottom: 10px;">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        </header>
-
         <section id="inicio" class="section active">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div class="card">
@@ -80,71 +106,325 @@
         </section>
 
         <section id="agendar" class="section">
-            <div class="card" style="max-width: 500px;">
+            <div class="card agendar-container">
                 <h2>Agendar Nueva Cita</h2>
-                <form method="POST">
+                <form method="POST" id="formAgendar">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="agendar_cita">
-                    
-                    <label>Psicólogo:</label>
-                    <select name="psicologo_id" required style="width: 100%; padding: 10px; margin: 10px 0;">
-                        {% for psi in psicologos %}
-                            <option value="{{ psi.numero }}">Dr. {{ psi.usuario.nombrePila }}</option>
-                        {% endfor %}
-                    </select>
 
-                    <label>Fecha:</label>
-                    <input type="date" name="fecha" required style="width: 100%; padding: 10px; margin: 10px 0;">
+                    <div class="form-group">
+                        <label>1. Servicio</label>
+                        <select name="servicio_id" id="step-servicio" required onchange="validarPaso1()">
+                            <option value="">Selecciona un servicio...</option>
+                            {% for serv in servicios %}
+                            <option value="{{ serv.clave }}" 
+                                    data-esp="{{ serv.especialidad.clave }}"
+                                    data-grupal="{{ serv.es_grupal_posible|yesno:'true,false' }}"
+                                    data-max="{{ serv.max_personas }}">
+                                {{ serv.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-                    <label>Hora:</label>
-                    <input type="time" name="hora" required style="width: 100%; padding: 10px; margin: 10px 0;">
+                    <div id="container-paso2" class="disabled-step">
+                        <label>2. Tipo de Sesión</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="tipo_sesion" value="individual" checked onclick="toggleCantidad(false)"> Individual</label>
+                            <label id="label-grupal" style="display:none;">
+                                <input type="radio" name="tipo_sesion" value="grupal" onclick="toggleCantidad(true)"> Grupal
+                            </label>
+                        </div>
+                        <div id="input-cantidad-container" style="display:none; margin-top:10px;">
+                            <label>¿Cuántas personas?</label>
+                            <input type="number" name="cantidad_personas" id="cantidad_personas" 
+                                min="1" value="1" onkeydown="return false;" onchange="validarPaso2()">
+                        </div>
+                    </div>
 
-                    <label>Modalidad:</label>
-                    <select name="modalidad_nombre" style="width: 100%; padding: 10px; margin: 10px 0;">
-                        <option value="Virtual">Virtual</option>
-                        <option value="Presencial">Presencial</option>
-                    </select>
+                    <div id="container-paso3" class="form-row disabled-step">
+                        <div class="form-group">
+                            <label>3. Fecha</label>
+                            <input type="date" name="fecha" id="step-fecha" required onchange="limpiarYBuscar()">
+                        </div>
+                        <div class="form-group">
+                            <label>Hora</label>
+                            <input type="time" name="hora" id="step-hora" required onchange="limpiarYBuscar()">
+                        </div>
+                    </div>
 
-                    <button type="submit" style="background: #0bafe5; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold;">Confirmar Cita</button>
+                    <div id="container-paso4" class="form-group disabled-step">
+                        <label>4. Psicólogo disponible</label>
+                        <div id="lista-psicologos" class="psicologo-grid">
+                            <p class="text-muted">Selecciona fecha y hora para ver doctores...</p>
+                        </div>
+                    </div>
+
+                    <div id="container-paso5" class="disabled-step">
+                        <label>5. Detalles finales</label>
+                        <select name="modalidad_nombre" required>
+                            <option value="Presencial">Presencial</option>
+                            <option value="Virtual">Virtual</option>
+                        </select>
+                        <textarea name="motivo" placeholder="Motivo de la consulta..." required></textarea>
+                        <button type="submit" class="btn-primary" style="width:100%; margin-top:20px;">Confirmar Cita</button>
+                    </div>
                 </form>
             </div>
         </section>
 
         <section id="mensajes" class="section">
-            <div class="card">
-                <h2>Chat con tu Psicólogo</h2>
-                <div id="chat-box" style="height: 300px; border: 1px solid #eee; border-radius: 8px; margin: 15px 0; padding: 15px; overflow-y: auto; background: #fafafa;">
-                    <p style="color: #888; text-align: center;">Inicia una conversación...</p>
+            <div class="card-chat-container">
+                <div class="chat-sidebar">
+                    <div class="chat-sidebar-header">
+                        <h3>Mis Psicólogos</h3>
+                        <div class="search-box">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                            <input type="text" id="buscarPsicologo" placeholder="Buscar psicólogo..." onkeyup="filtrarPsicologos()">
+                        </div>
+                    </div>
+                    
+                    <ul id="lista-psicologos-chat">
+                        {% for psi in mis_psicologos %}
+                        <li class="chat-item" onclick="seleccionarChatPsicologo('{{ psi.usuario.numero }}', '{{ psi.usuario.nombrePila }}', event)">
+                            <div class="chat-avatar">
+                                {% if psi.usuario.fotoPerfil %}
+                                    <img src="{{ psi.usuario.fotoPerfil.url }}" alt="Dr. {{ psi.usuario.nombrePila }}">
+                                {% else %}
+                                    <img src="/static/img/default.png" alt="Dr. {{ psi.usuario.nombrePila }}">
+                                {% endif %}
+                            </div>
+                            <div class="chat-info">
+                                <div class="chat-info-top">
+                                    <span class="chat-name">Dr. {{ psi.usuario.nombrePila }}</span>
+                                    <span class="chat-time">10:30 AM</span> </div>
+                                <div class="chat-last-msg">Haz clic para ver la conversación...</div>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="chat-empty">No tienes citas con psicólogos para chatear.</li>
+                        {% endfor %}
+                    </ul>
                 </div>
-                <form method="POST" style="display: flex; gap: 10px;">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="enviar_mensaje">
-                    <input type="text" name="mensaje" placeholder="Escribe aquí..." required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
-                    <button type="submit" style="background: #0bafe5; color: white; border: none; padding: 10px 20px; border-radius: 8px;">Enviar</button>
-                </form>
+
+                <div class="chat-main">
+                    <div id="chat-header">
+                        <span id="chat-header-name">Selecciona un psicólogo para comenzar</span>
+                    </div>
+                    
+                    <div id="chat-box-paciente">
+                        <div class="chat-welcome">
+                            <p>Tus mensajes están protegidos de extremo a extremo.</p>
+                        </div>
+                    </div>
+
+                    <form id="form-chat-paciente" style="display: none;">
+                        {% csrf_token %}
+                        <input type="hidden" id="receptor_id">
+                        <div class="chat-input-wrapper">
+                            <input type="text" id="input-mensaje-paciente" placeholder="Escribe un mensaje..." required>
+                            <button type="submit" id="btn-enviar-chat">
+                                <span>Enviar</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </section>
 
         <section id="misCitas" class="section">
-            <h2>Historial de Citas</h2>
-            {% for cita in citas %}
-                <div class="box">
-                    <span><strong>{{ cita.fecha }}</strong> - {{ cita.hora }}</span>
-                    <span>Dr. {{ cita.psicologo.usuario.nombrePila }}</span>
-                    <span style="color: #0bafe5;">{{ cita.estado.nombre }}</span>
+            <div class="header-section">
+                <h2>Mis citas</h2>
+                <p>Consulta tu historial de citas, revisa el estado de cada sesión y encuentra rápidamente tus consultas.</p>
+            </div>
+
+            <div class="filter-bar">
+                <div class="date-filter-container">
+                    <label for="filtroFecha" class="filter-label">Buscar por fecha</label>
+                    <div class="date-input-wrapper">
+                        <input type="date" id="filtroFecha" onchange="filtrarCitas()">
+                    </div>
                 </div>
-            {% empty %}
-                <p>No tienes citas registradas.</p>
-            {% endfor %}
+                <div class="status-filters">
+                    <button class="btn-filter active" onclick="filtrarPorEstado('Todas', this)">Todas</button>
+                    <button class="btn-filter" onclick="filtrarPorEstado('Pendiente', this)">Pendientes</button>
+                    <button class="btn-filter" onclick="filtrarPorEstado('Atendida', this)">Atendidas</button>
+                    <button class="btn-filter" onclick="filtrarPorEstado('Cancelada', this)">Canceladas</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="citas-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha y hora</th>
+                            <th>Psicólogo</th>
+                            <th>Consulta</th>
+                            <th>Estado</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaCitasBody">
+                        {% for cita in citas %}
+                        <tr class="cita-row" data-estado="{{ cita.estado.nombre }}" data-fecha="{{ cita.fecha|date:'Y-m-d' }}">
+                            <td>
+                                <strong>{{ cita.fecha|date:"d \d\e F, Y" }}</strong><br>
+                                <small>{{ cita.hora }}</small>
+                            </td>
+                            <td>
+                                <div class="user-info-table">
+                                    <img src="{{ cita.psicologo.usuario.fotoPerfil.url }}" class="avatar-table">
+                                    <div>
+                                        <span>Dr. {{ cita.psicologo.usuario.nombrePila }}</span><br>
+                                        <small>{{ cita.psicologo.especialidad|default:"Psicólogo Clínico" }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span>{{ cita.motivo }}</span><br>
+                                <small>{{ cita.modalidad.nombre }}</small>
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ cita.estado.nombre|lower }}">
+                                    {{ cita.estado.nombre }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if cita.estado.nombre == 'Pendiente' %}
+                                <form id="form-cancelar-{{ cita.numero }}" method="POST" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="cancelar_cita">
+                                    <input type="hidden" name="cita_id" value="{{ cita.numero }}">
+                                    <button type="button" class="btn-cancel" onclick="confirmarCancelacion('{{ cita.numero }}')">
+                                        Cancelar
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 20px;">No tienes citas registradas.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </section>
+        <section id="perfil" class="section" style="display: none;">
+            <div class="perfil-container" style="max-width: 800px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden;">
+                
+                <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 40px; text-align: center; color: white;">
+                    <div style="position: relative; display: inline-block;">
+                        <img src="{{ user.fotoPerfil.url }}" style="width: 120px; height: 120px; border-radius: 50%; border: 4px solid white; object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                    </div>
+                    <h2 style="margin: 15px 0 5px 0;">{{ user.nombrePila }} {{ user.primerApellido }}</h2>
+                    <p style="opacity: 0.9; margin: 0;">Paciente de Free You Mind</p>
+                </div>
 
+                <div style="padding: 30px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+                        
+                        <div class="info-group">
+                            <label style="display: block; color: #888; font-size: 12px; font-weight: bold; text-transform: uppercase;">Nombre Completo</label>
+                            <p style="font-size: 16px; color: #333; margin: 5px 0;">{{ user.nombrePila }} {{ user.primerApellido }} {{ user.segundoApellido }}</p>
+                        </div>
+
+                        <div class="info-group">
+                            <label style="display: block; color: #888; font-size: 12px; font-weight: bold; text-transform: uppercase;">Edad</label>
+                            <p style="font-size: 16px; color: #333; margin: 5px 0;">{{ edad }} años</p>
+                        </div>
+
+                        <div class="info-group">
+                            <label style="display: block; color: #888; font-size: 12px; font-weight: bold; text-transform: uppercase;">Género</label>
+                            <p style="font-size: 16px; color: #333; margin: 5px 0;">{{ user.genero }}</p>
+                        </div>
+
+                        <div class="info-group">
+                            <label style="display: block; color: #888; font-size: 12px; font-weight: bold; text-transform: uppercase;">Correo Electrónico</label>
+                            <p style="font-size: 16px; color: #333; margin: 5px 0;">{{ user.correo }}</p>
+                        </div>
+
+                        <div class="info-group">
+                            <label style="display: block; color: #888; font-size: 12px; font-weight: bold; text-transform: uppercase;">Teléfono</label>
+                            <p style="font-size: 16px; color: #333; margin: 5px 0;">{{ telefono }}</p>
+                        </div>
+
+                    </div>
+
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
+
+                    <div style="display: flex; gap: 15px; justify-content: center;">
+                        <button onclick="abrirModalEditar()" style="background: #4facfe; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s;">
+                             Actualizar Datos
+                        </button>
+                        
+                        <a href="{% url 'logout' %}" style="text-decoration: none; background: #fff; color: #ff4757; border: 2px solid #ff4757; padding: 10px 25px; border-radius: 8px; font-weight: bold; transition: 0.3s;">
+                            Salir del Sistema
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+            <div id="modalPerfil" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+        <div style="background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative;">
+            <span onclick="cerrarModalPerfil()" style="position: absolute; top: 15px; right: 20px; font-size: 24px; cursor: pointer; color: #888;">&times;</span>
+            
+            <h3 style="margin-top: 0; color: #333; border-bottom: 2px solid #4facfe; padding-bottom: 10px;">Actualizar Mis Datos</h3>
+            
+            <form method="POST" id="formActualizarPerfil" style="margin-top: 20px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="actualizar_perfil">
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; color: #555;">Correo Electrónico:</label>
+                    <input type="email" name="nuevo_correo" value="{{ user.correo }}" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; color: #555;">Teléfono:</label>
+                    <input type="text" name="nuevo_telefono" value="{{ telefono }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                </div>
+
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #4facfe; margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; color: #555;">Nueva Contraseña (opcional):</label>
+                    <input type="password" name="nueva_contrasena" placeholder="Dejar en blanco si no deseas cambiarla" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                </div>
+
+                <div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 8px; font-size: 12px; margin-bottom: 20px; line-height: 1.4;">
+                    ⚠️ <strong>Nota:</strong> Para modificar datos sensibles como nombre, apellidos o género, por favor envía un mensaje a <strong>soporte</strong>.
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" style="flex: 1; background: #4facfe; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s;">
+                        Guardar Cambios
+                    </button>
+                    <button type="button" onclick="cerrarModalPerfil()" style="flex: 1; background: #eee; color: #333; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
     </main>
-
     <script>
         function showSection(id) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
         }
     </script>
+    {% if messages %}
+        <script>
+            {% for message in messages %}
+                Swal.fire({
+                    icon: "{% if message.tags == 'success' %}success{% else %}info{% endif %}",
+                    title: "{{ message }}",
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+            {% endfor %}
+        </script>
+    {% endif %}
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="{% static 'js/paciente.js' %}"></script>
 </body>
 </html>

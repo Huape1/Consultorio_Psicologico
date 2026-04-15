@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from zoneinfo import ZoneInfo
-from datetime import datetime
+from datetime import datetime, date
 from django.db import transaction
 from django.contrib.auth import logout
 from django.contrib.auth import authenticate, login as auth_login
@@ -16,6 +16,9 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import json
 from django.http import JsonResponse
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 # Create your views here.
 def index(request):
@@ -47,7 +50,7 @@ def login(request):
             tipo = user.tipoUsuario_id
 
             if tipo == 1:
-                return redirect('/paciente/')
+                return redirect('paciente')
             elif tipo == 2:
                 return redirect('/panel/')
             elif tipo == 3:
@@ -169,67 +172,6 @@ def eliminar_especialidad(request):
 def esp(request):
     return render(request, 'panel_psicologo')
 
-#Pacientes
-def paciente(request):
-    # 1. Obtener instancia del paciente
-    paciente_instancia = get_object_or_404(Paciente, usuario=request.user)
-    
-    # --- PROCESAMIENTO DE FORMULARIOS (POST) ---
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        
-        # A. AGENDAR CITA
-        if action == 'agendar_cita':
-            psi_id = request.POST.get('psicologo_id')
-            fecha = request.POST.get('fecha')
-            hora = request.POST.get('hora')
-            mod_nombre = request.POST.get('modalidad_nombre')
-            
-            psicologo = get_object_or_404(Psicologo, numero=psi_id)
-            modalidad, _ = Modalidad.objects.get_or_create(nombre=mod_nombre or 'Virtual')
-            estado_pend, _ = EdoCita.objects.get_or_create(nombre='Pendiente')
-            
-            # Buscamos servicio, si no existe lo creamos con precio incluido
-            servicio = Servicio.objects.first()
-            if not servicio:
-                servicio = Servicio.objects.create(
-                    nombre="Consulta General", 
-                    descripcion="Sesión estándar",
-                    precio=0  # Ajusta este valor según tu modelo
-                )
-
-            Cita.objects.create(
-                fecha=fecha, 
-                hora=hora, 
-                motivo="Consulta",
-                psicologo=psicologo, 
-                paciente=paciente_instancia,
-                servicio=servicio, 
-                modalidad=modalidad, 
-                estado=estado_pend
-            )
-            messages.success(request, "¡Cita agendada correctamente!")
-
-        # B. ACTUALIZAR PERFIL
-        elif action == 'actualizar_perfil':
-            request.user.nombrePila = request.POST.get('nombre')
-            request.user.email = request.POST.get('email')
-            request.user.save()
-            messages.success(request, "Perfil actualizado con éxito.")
-
-        return redirect('/paciente/')
-
-    # --- CARGA DE DATOS PARA LA INTERFAZ ---
-    citas_queryset = Cita.objects.filter(paciente=paciente_instancia).order_by('-fecha')
-    
-    contexto = {
-        'psicologos': Psicologo.objects.all(),
-        'citas': citas_queryset,
-        'conteo_sesiones': citas_queryset.count(),
-        'proxima_cita': citas_queryset.filter(fecha__gte=timezone.now().date()).last(),
-    }
-    
-    return render(request, 'paciente/paciente.html', contexto)
 
 #Psicologos
 @transaction.atomic
@@ -1079,3 +1021,243 @@ def panel_psicologos(request):
         'telefono': telefono_obj.numTel if telefono_obj else "",
     }
     return render(request, 'psicologos/psicologo.html', contexto)
+
+@login_required
+def paciente(request):
+    # 1. Obtener instancia del paciente
+    paciente_instancia = get_object_or_404(Paciente, usuario=request.user)
+    
+    # --- PROCESAMIENTO DE FORMULARIOS (POST) ---
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        # A. AGENDAR CITA
+        if action == 'agendar_cita':
+            psi_id = request.POST.get('psicologo_id')
+            fecha = request.POST.get('fecha')
+            hora = request.POST.get('hora')
+            mod_nombre = request.POST.get('modalidad_nombre')
+            
+            psicologo = get_object_or_404(Psicologo, numero=psi_id)
+            modalidad, _ = Modalidad.objects.get_or_create(nombre=mod_nombre or 'Virtual')
+            estado_pend, _ = EdoCita.objects.get_or_create(nombre='Pendiente')
+            
+            servicio = Servicio.objects.first()
+            if not servicio:
+                servicio = Servicio.objects.create(
+                    nombre="Consulta General", 
+                    descripcion="Sesión estándar",
+                    precio=0
+                )
+
+            Cita.objects.create(
+                fecha=fecha, 
+                hora=hora, 
+                motivo="Consulta",
+                psicologo=psicologo, 
+                paciente=paciente_instancia,
+                servicio=servicio, 
+                modalidad=modalidad, 
+                estado=estado_pend
+            )
+            messages.success(request, "¡Cita agendada correctamente!")
+        elif action == 'cancelar_cita':
+            cita_id = request.POST.get('cita_id')
+            # Buscamos la cita asegurándonos de que pertenezca al paciente actual
+            cita_a_cancelar = get_object_or_404(Cita, numero=cita_id, paciente=paciente_instancia)
+            
+            # Obtenemos o creamos el estado 'Cancelada'
+            estado_cancelada, _ = EdoCita.objects.get_or_create(nombre='Cancelada')
+            
+            # Actualizamos la cita
+            cita_a_cancelar.estado = estado_cancelada
+            cita_a_cancelar.save()
+            
+            messages.info(request, "La cita ha sido cancelada.")
+        # B. ACTUALIZAR PERFIL
+        elif action == 'actualizar_perfil':
+            nuevo_correo = request.POST.get('nuevo_correo')
+            nuevo_tel = request.POST.get('nuevo_telefono')
+            nueva_pass = request.POST.get('nueva_contrasena')
+
+            # 1. Actualizar correo en el objeto Usuario
+            request.user.correo = nuevo_correo
+            
+            # 2. Si hay nueva contraseña, encriptarla antes de guardar
+            if nueva_pass and len(nueva_pass.strip()) > 0:
+                request.user.set_password(nueva_pass)
+                # Importante: al cambiar contraseña la sesión puede cerrarse
+                # Necesitas: from django.contrib.auth import update_session_auth_hash
+                from django.contrib.auth import update_session_auth_hash
+                update_session_auth_hash(request, request.user)
+
+            request.user.save()
+
+            # 3. Actualizar teléfono en la tabla Telefono
+            telefono_obj, _ = Telefono.objects.get_or_create(usuario=request.user)
+            telefono_obj.numTel = nuevo_tel
+            telefono_obj.save()
+
+            messages.success(request, "Tus datos se han actualizado correctamente.")
+            return redirect('/paciente/')
+
+    # --- CARGA DE DATOS PARA LA INTERFAZ ---
+    citas_queryset = Cita.objects.filter(paciente=paciente_instancia).order_by('-fecha')
+    
+    # Lógica para Mensajería: Solo psicólogos con los que ha tenido cita
+    ids_usuarios_psicologos = citas_queryset.values_list('psicologo__usuario_id', flat=True).distinct()
+    mis_psicologos_chat = Psicologo.objects.filter(usuario_id__in=ids_usuarios_psicologos).select_related('usuario')
+    
+    hoy = date.today()
+    nacimiento = paciente_instancia.fechaNacimiento
+    edad = hoy.year - nacimiento.year - ((hoy.month, hoy.day) < (nacimiento.month, nacimiento.day))
+
+    # Obtener teléfono (asumiendo que puede tener varios, tomamos el primero)
+    telefono_obj = Telefono.objects.filter(usuario=request.user).first()
+    telefono = telefono_obj.numTel if telefono_obj else "No registrado"
+
+    contexto = {
+        'psicologos': Psicologo.objects.all(), # Para el modal de agendar
+        'servicios': Servicio.objects.filter(especialidad__isnull=False), # Asegúrate de enviar esto
+        'mis_psicologos': mis_psicologos_chat, # Para la lista de mensajes
+        'citas': citas_queryset,
+        'conteo_sesiones': citas_queryset.count(),
+        'proxima_cita': citas_queryset.filter(fecha__gte=timezone.now().date()).last(),
+        'user': request.user,
+        'paciente': paciente_instancia,
+        'edad': edad,
+        'telefono': telefono,
+        'user': request.user,
+    }
+    
+    return render(request, 'paciente/paciente.html', contexto)
+
+@login_required
+def obtener_mensajes_paciente(request):
+    psicologo_user_id = request.GET.get('psicologo_id')
+    if not psicologo_user_id:
+        return JsonResponse([], safe=False)
+
+    # 1. Buscamos la conversación que comparten el paciente y el psicólogo
+    # Primero obtenemos todas las conversaciones del paciente actual
+    mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+    
+    # Buscamos si en alguna de esas conversaciones también está el psicólogo
+    relacion_comun = ConvUsuario.objects.filter(
+        conversacion_id__in=mis_convs, 
+        usuario_id=psicologo_user_id
+    ).first()
+
+    if not relacion_comun:
+        return JsonResponse([], safe=False)
+
+    # 2. Obtenemos los mensajes usando el campo 'conversacion' y ordenamos por 'fechaEnvio'
+    mensajes_queryset = Mensaje.objects.filter(
+        conversacion=relacion_comun.conversacion
+    ).order_by('fechaEnvio')
+    
+    data = [{
+        'texto': m.contenido,
+        'tipo': 'sent' if m.usuario == request.user else 'received',
+        'hora': m.fechaEnvio.strftime('%H:%M'),
+    } for m in mensajes_queryset]
+        
+    return JsonResponse(data, safe=False)
+
+@login_required
+def enviar_mensaje_paciente(request):
+    if request.method == 'POST':
+        receptor_id = request.POST.get('receptor_id')
+        contenido = request.POST.get('contenido')
+
+        if not receptor_id or not contenido:
+            return JsonResponse({'status': 'error'}, status=400)
+
+        # 1. Verificar si ya existe la conversación o crearla
+        mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+        relacion = ConvUsuario.objects.filter(
+            conversacion_id__in=mis_convs, 
+            usuario_id=receptor_id
+        ).first()
+
+        if relacion:
+            conversacion_obj = relacion.conversacion
+        else:
+            # Creamos la conversación nueva si no existía
+            conversacion_obj = Conversacion.objects.create(fechaInicio=timezone.now())
+            ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=request.user)
+            psicologo_user = get_object_or_404(Usuario, numero=receptor_id)
+            ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=psicologo_user)
+
+        # 2. Crear el mensaje ligado a esa conversación
+        Mensaje.objects.create(
+            contenido=contenido,
+            fechaEnvio=timezone.now(),
+            conversacion=conversacion_obj,
+            usuario=request.user
+        )
+
+        return JsonResponse({'status': 'ok'})
+    return JsonResponse({'status': 'error'}, status=400)
+
+import datetime
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+
+def api_psicologos_disponibles(request):
+    servicio_id = request.GET.get('servicio')
+    hora_str = request.GET.get('hora')
+    fecha_str = request.GET.get('fecha') # "2026-04-13"
+
+    if not all([servicio_id, hora_str, fecha_str]):
+        return JsonResponse([], safe=False)
+
+    try:
+        # 1. Obtener la hora y el nombre del día de la fecha seleccionada
+        hora_input = datetime.datetime.strptime(hora_str, "%H:%M").time()
+        fecha_obj = datetime.datetime.strptime(fecha_str, "%Y-%m-%d")
+        
+        # Mapeo de días de Python a tu formato de DB (Español con tildes)
+        dias_map = {
+            0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 
+            3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'
+        }
+        nombre_dia_selec = dias_map[fecha_obj.weekday()]
+
+        servicio = get_object_or_404(Servicio, clave=servicio_id)
+        psicologos = Psicologo.objects.filter(especialidad=servicio.especialidad)
+        
+        disponibles = []
+
+        for psi in psicologos:
+            turnos = HorPsicologo.objects.filter(psicologo=psi)
+            for t in turnos:
+                # 2. Validar si el día coincide
+                # Buscamos si "Miércoles" está dentro de "Lunes, Martes, Miércoles..."
+                if nombre_dia_selec not in t.horario.dias:
+                    continue
+
+                # 3. Validar el rango de horas (Formato 24h: 08:00 - 16:00)
+                try:
+                    rango = t.horario.horas.strip()
+                    partes = rango.split(' - ')
+                    
+                    # Usamos %H:%M para formato 24 horas
+                    inicio = datetime.datetime.strptime(partes[0].strip(), "%H:%M").time()
+                    fin = datetime.datetime.strptime(partes[1].strip(), "%H:%M").time()
+
+                    if inicio <= hora_input <= fin:
+                        disponibles.append({
+                            "id": psi.numero,
+                            "nombre": psi.usuario.nombrePila,
+                            "foto": psi.usuario.fotoPerfil.url if psi.usuario.fotoPerfil else '/media/perfiles/default.png'
+                        })
+                        break # Ya encontramos que este psicólogo está libre en este turno
+                except Exception as e:
+                    print(f"Error en formato de hora para turno {t.horario.numero}: {e}")
+                    continue
+
+        return JsonResponse(disponibles, safe=False)
+    except Exception as e:
+        print(f"Error general en API: {e}")
+        return JsonResponse([], status=500)

@@ -1,4 +1,86 @@
-function toggleMenu(){
+let psicologoSeleccionadoId = null;
+
+
+// Agregamos 'event' como parámetro
+async function seleccionarChatPsicologo(id, nombreCompleto, event) {
+    psicologoSeleccionadoId = id;
+
+    // UI: Cambiar encabezado
+    document.getElementById('chat-header').innerHTML = ` Dr. ${nombreCompleto}`;
+    document.getElementById('receptor_id').value = id;
+    document.getElementById('form-chat-paciente').style.display = 'block';
+
+    // UI: Resaltar (ahora usando el event que pasamos)
+    document.querySelectorAll('#lista-psicologos-chat li').forEach(el => el.style.background = 'transparent');
+    if (event && event.currentTarget) {
+        event.currentTarget.style.background = '#e0f4ff';
+    }
+
+    // AHORA SÍ hará la petición
+    actualizarMensajesPaciente();
+}
+
+async function actualizarMensajesPaciente() {
+    if (!psicologoSeleccionadoId) return;
+
+    const contenedor = document.getElementById('chat-box-paciente');
+
+    try {
+        const response = await fetch(`/obtener_mensajes_paciente/?psicologo_id=${psicologoSeleccionadoId}`);
+        const mensajes = await response.json();
+
+        contenedor.innerHTML = ''; // Limpiar
+        mensajes.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = `message ${msg.tipo}`; // 'sent' o 'received'
+            div.innerHTML = `<div>${msg.texto}</div><small>${msg.hora}</small>`;
+            contenedor.appendChild(div);
+        });
+        contenedor.scrollTop = contenedor.scrollHeight;
+    } catch (e) {
+        console.error("Error al cargar mensajes:", e);
+    }
+}
+
+// Manejo del Envío
+// Manejar el envío del formulario
+const formChat = document.getElementById('form-chat-paciente');
+if (formChat) {
+    formChat.onsubmit = async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('input-mensaje-paciente');
+        const receptorId = document.getElementById('receptor_id').value;
+        const texto = input.value.trim();
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        if (!texto || !receptorId) return;
+
+        const formData = new FormData();
+        formData.append('contenido', texto);
+        formData.append('receptor_id', receptorId);
+        formData.append('csrfmiddlewaretoken', csrfToken);
+
+        try {
+            const response = await fetch('/enviar_mensaje_paciente/', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+
+            if (response.ok) {
+                input.value = '';
+                actualizarMensajesPaciente(); // Refresca las burbujas
+            }
+        } catch (error) {
+            console.error("Error al enviar:", error);
+        }
+    };
+}
+
+// Actualización automática cada 3 segundos
+setInterval(actualizarMensajesPaciente, 3000);
+
+function toggleMenu() {
 const sidebar=document.getElementById("sidebar");
 const content=document.querySelector(".content");
 
@@ -78,6 +160,98 @@ actualizarInicio();
 
 }
 
+function validarPaso1() {
+    const select = document.getElementById('step-servicio');
+    const option = select.options[select.selectedIndex];
+    const container2 = document.getElementById('container-paso2');
+    const labelGrupal = document.getElementById('label-grupal');
+    
+    if (select.value) {
+        container2.classList.remove('disabled-step');
+        // Mostrar opción grupal solo si el servicio lo permite
+        labelGrupal.style.display = (option.dataset.grupal === 'true') ? 'inline-block' : 'none';
+        document.getElementById('cantidad_personas').max = option.dataset.max;
+        document.getElementById('container-paso3').classList.remove('disabled-step');
+    }
+}
+
+function validarPaso2() {
+    const cantidad = document.getElementById('cantidad_personas').value;
+    const servicioSelect = document.getElementById('step-servicio');
+    const maxPermitido = servicioSelect.options[servicioSelect.selectedIndex].dataset.max;
+
+    if (parseInt(cantidad) > parseInt(maxPermitido)) {
+        alert(`El máximo de personas para este servicio es ${maxPermitido}`);
+        document.getElementById('cantidad_personas').value = maxPermitido;
+    }
+    // Si todo está bien, podemos habilitar el siguiente paso
+    document.getElementById('container-paso3').classList.remove('disabled-step');
+}
+
+function toggleCantidad(show) {
+    document.getElementById('input-cantidad-container').style.display = show ? 'block' : 'none';
+}
+
+function activarPaso5() {
+    document.getElementById('container-paso5').classList.remove('disabled-step');
+}
+
+function limpiarYBuscar() {
+    const lista = document.getElementById('lista-psicologos');
+    const fechaInput = document.getElementById('step-fecha');
+    const fecha = new Date(fechaInput.value + 'T00:00:00'); // Evitar desfase de zona horaria
+    const diaSemana = fecha.getDay(); // 0 es Domingo, 6 Sábado
+
+    // Ejemplo: Bloquear fines de semana (Sábado=6, Domingo=0)
+    // Deberías ajustar esto según tus modelos de Horario
+    if (diaSemana === 0 || diaSemana === 6) {
+        alert("Lo sentimos, no hay servicios disponibles en fines de semana.");
+        fechaInput.value = "";
+        return;
+    }
+
+    lista.innerHTML = '<p class="text-muted">Buscando doctores disponibles...</p>';
+    fetchPsicologosDisponibles();
+}
+
+// En la función fetchPsicologosDisponibles, asegúrate de enviar los datos correctos:
+function fetchPsicologosDisponibles() {
+    const servicioId = document.getElementById('step-servicio').value;
+    const fecha = document.getElementById('step-fecha').value;
+    const hora = document.getElementById('step-hora').value;
+
+    if (!servicioId || !fecha || !hora) return;
+
+    fetch(`/api/psicologos-disponibles/?servicio=${servicioId}&fecha=${fecha}&hora=${hora}`)
+        .then(res => {
+            if (!res.ok) throw new Error('Error en el servidor');
+            return res.json();
+        })
+        .then(data => {
+            const container = document.getElementById('lista-psicologos');
+            container.innerHTML = "";
+            
+            if (data.length === 0) {
+                container.innerHTML = '<p class="error-msg">No hay doctores disponibles en este horario.</p>';
+                return;
+            }
+
+            data.forEach(psi => {
+                container.innerHTML += `
+                    <label class="psi-card-option">
+                        <input type="radio" name="psicologo_id" value="${psi.id}" required onclick="activarPaso5()">
+                        <div class="psi-info">
+                            <img src="${psi.foto}" class="avatar-table">
+                            <span>Dr. ${psi.nombre}</span>
+                        </div>
+                    </label>`;
+            });
+        })
+        .catch(err => {
+            console.error(err);
+            document.getElementById('lista-psicologos').innerHTML = '<p class="error-msg">Ocurrió un error al buscar psicólogos.</p>';
+        });
+}
 
 function mostrarCitas(){
 
@@ -93,6 +267,57 @@ citas.forEach(cita=>{
 lista.innerHTML+=`<div class="box">${cita.fecha} - ${cita.hora} - ${cita.doctor}</div>`;
 });
 
+}
+
+function confirmarCancelacion(citaId) {
+    Swal.fire({
+        title: '¿Estás seguro?',
+        text: "Esta acción no se puede deshacer y la cita quedará como cancelada.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ff4757', // Rojo para cancelar
+        cancelButtonColor: '#adb5bd', // Gris para arrepentirse
+        confirmButtonText: 'Sí, cancelar cita',
+        cancelButtonText: 'No, mantenerla',
+        reverseButtons: true, // Pone el botón de "No" a la izquierda
+        background: '#fff',
+        backdrop: `rgba(0,0,0,0.4)`
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Buscamos el formulario específico y lo enviamos
+            document.getElementById(`form-cancelar-${citaId}`).submit();
+        }
+    })
+}
+
+function filtrarCitas() {
+    const fechaSeleccionada = document.getElementById('filtroFecha').value;
+    const filas = document.querySelectorAll('.cita-row');
+
+    filas.forEach(fila => {
+        const fechaCita = fila.getAttribute('data-fecha');
+        if (!fechaSeleccionada || fechaCita === fechaSeleccionada) {
+            fila.style.display = "";
+        } else {
+            fila.style.display = "none";
+        }
+    });
+}
+
+function filtrarPorEstado(estado, btn) {
+    // Cambiar clase activa en botones
+    document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const filas = document.querySelectorAll('.cita-row');
+    filas.forEach(fila => {
+        const estadoCita = fila.getAttribute('data-estado');
+        if (estado === 'Todas' || estadoCita === estado) {
+            fila.style.display = "";
+        } else {
+            fila.style.display = "none";
+        }
+    });
 }
 
 
@@ -149,6 +374,22 @@ mensajes.forEach(msg=>{
 lista.innerHTML+=`<div class="box">${msg}</div>`;
 });
 
+}
+
+function filtrarPsicologos() {
+    const input = document.getElementById('buscarPsicologo');
+    const filtro = input.value.toLowerCase();
+    const lista = document.getElementById('lista-psicologos-chat');
+    const items = lista.getElementsByClassName('chat-item');
+
+    for (let i = 0; i < items.length; i++) {
+        const nombre = items[i].querySelector('.chat-name').innerText.toLowerCase();
+        if (nombre.includes(filtro)) {
+            items[i].style.display = "flex";
+        } else {
+            items[i].style.display = "none";
+        }
+    }
 }
 
 
@@ -227,6 +468,22 @@ localStorage.setItem("user",JSON.stringify(nuevo));
 
 alert("Perfil actualizado");
 
+}
+
+function abrirModalEditar() {
+    document.getElementById('modalPerfil').style.display = 'flex';
+}
+
+function cerrarModalPerfil() {
+    document.getElementById('modalPerfil').style.display = 'none';
+}
+
+// Cerrar si el usuario hace clic fuera del contenido blanco
+window.onclick = function (event) {
+    let modal = document.getElementById('modalPerfil');
+    if (event.target == modal) {
+        cerrarModalPerfil();
+    }
 }
 
 

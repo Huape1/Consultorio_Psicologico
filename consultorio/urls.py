@@ -41,4 +41,9 @@ urlpatterns = [
     path('', include(router.urls)),
     path('api/login/', views.api_login), # Apunta a la nueva función Json
     path('api/registro-api/', views.api_registro_paciente), # Apunta a la nueva función Json
+    # Paciente
+    #path('panel_paciente/', views.panel_paciente, name='panel_paciente'),
+    path('enviar_mensaje_paciente/', views.enviar_mensaje_paciente, name='enviar_mensaje_paciente'),
+    path('obtener_mensajes_paciente/', views.obtener_mensajes_paciente, name='obtener_mensajes_paciente'),
+    path('api/psicologos-disponibles/', views.api_psicologos_disponibles, name='api_psicologos_disponibles'),
 ]

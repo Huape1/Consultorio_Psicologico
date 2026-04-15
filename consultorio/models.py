@@ -135,6 +135,13 @@ class Servicio(models.Model):
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(blank=True, null=True)
     precio = models.DecimalField(max_digits=10, decimal_places=2)
+    # Nuevos campos
+    especialidad = models.ForeignKey(Especialidad, on_delete=models.CASCADE, related_name='servicios')
+    es_grupal_posible = models.BooleanField(default=False) # Si el servicio admite grupos
+    max_personas = models.IntegerField(default=1)
+
+    def __str__(self):
+        return self.nombre
 
 
 # ========================
