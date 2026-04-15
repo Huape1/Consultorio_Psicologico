@@ -91,17 +91,97 @@
 
     <main class="content">
         <section id="inicio" class="section active">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div class="card">
-                    <h3>Próxima Cita</h3>
-                    <p style="font-size: 20px; color: #0bafe5; font-weight: bold;">
-                        {% if proxima_cita %}{{ proxima_cita.fecha }} - {{ proxima_cita.hora }}{% else %}No hay citas programadas{% endif %}
-                    </p>
+            <div class="dashboard-grid">
+                
+                <div class="card main-appointment-card">
+                    <div class="card-header">
+                        <span class="badge-status">Confirmada</span>
+                        <h3>Próxima cita</h3>
+                    </div>
+                    {% if proxima_cita %}
+                        <h2 class="display-date">{{ proxima_cita.fecha|date:"d F" }}</h2>
+                        <div class="appointment-details-grid">
+                            <div>
+                                <label>Hora</label>
+                                <p>{{ proxima_cita.hora|time:"g:i A" }}</p>
+                            </div>
+                            <div>
+                                <label>Especialidad</label>
+                                <p>{{ proxima_cita.servicio.nombre }}</p>
+                            </div>
+                            <div>
+                                <label>Psicólogo</label>
+                                <p>Dr. {{ proxima_cita.psicologo.usuario.nombrePila }}</p>
+                            </div>
+                        </div>
+                        <button class="btn-primary" onclick="showSection('agendar')">Agendar Cita</button>
+                    {% else %}
+                        <p class="text-muted">No tienes citas pendientes.</p>
+                        <button class="btn-primary" onclick="showSection('agendar')">Agendar ahora</button>
+                    {% endif %}
                 </div>
+
                 <div class="card">
-                    <h3>Sesiones Completadas</h3>
-                    <p style="font-size: 24px; font-weight: bold;">{{ conteo_sesiones }}</p>
+                    <h3>Siguientes citas</h3>
+                    <div class="mini-list">
+                        {% for cita in siguientes_citas %}
+                        <div class="mini-item">
+                            <div class="mini-date">
+                                <strong>{{ cita.fecha|date:"d" }}</strong>
+                                <span>{{ cita.fecha|date:"M" }}</span>
+                            </div>
+                            <div class="mini-info">
+                                <p>{{ cita.servicio.nombre }}</p>
+                                <small>{{ cita.hora|time:"g:i A" }}</small>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted">No hay más citas programadas.</p>
+                        {% endfor %}
+                    </div>
+                    <button class="btn-outline" onclick="showSection('mis-citas')" style="margin-top:15px; width:100%;">Ver mis citas</button>
                 </div>
+
+                <div class="card info-mini-card">
+                    <h3>Sesiones realizadas</h3>
+                    <h2 class="display-number">{{ conteo_sesiones }}</h2>
+                    <p class="text-muted">Tu seguimiento avanza de forma constante con registro de citas anteriores.</p>
+                </div>
+
+                <div class="card info-mini-card">
+                    <div class="card-header-flex">
+                        <h3>Mensajes recientes</h3>
+                        <span class="badge-count">{{ ultimos_mensajes|length }}</span>
+                    </div>
+                    
+                    <div class="message-preview-list">
+                        {% for msg in ultimos_mensajes %}
+                        <div class="msg-preview-item" onclick="seleccionarChatYIr('{{ msg.usuario.numero }}', '{{ msg.usuario.nombrePila }}')">
+                            <div class="msg-preview-avatar">
+                                {% if msg.usuario.fotoPerfil %}
+                                    <img src="{{ msg.usuario.fotoPerfil.url }}">
+                                {% else %}
+                                    <div class="avatar-placeholder">{{ msg.usuario.nombrePila|slice:":1" }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="msg-preview-content">
+                                <div class="msg-preview-top">
+                                    <strong>Dr. {{ msg.usuario.nombrePila }}</strong>
+                                    <small>{{ msg.fechaEnvio|time:"g:i A" }}</small>
+                                </div>
+                                <p class="msg-text-truncate">{{ msg.contenido|truncatechars:35 }}</p>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="empty-messages">
+                            <p class="display-number">0</p>
+                            <p class="text-muted">Sin mensajes pendientes.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button class="btn-link-full" onclick="showSection('mensajes')">Ver toda la bandeja</button>
+                </div>
+
             </div>
         </section>
 
@@ -201,23 +281,24 @@
                     
                     <ul id="lista-psicologos-chat">
                         {% for psi in mis_psicologos %}
-                        <li class="chat-item" onclick="seleccionarChatPsicologo('{{ psi.usuario.numero }}', '{{ psi.usuario.nombrePila }}', event)">
+                        <li class="chat-item {% if psi.sin_leer %}unread{% endif %}" 
+                            onclick="seleccionarChatPsicologo('{{ psi.usuario.numero }}', '{{ psi.usuario.nombrePila }}', event)">
+                            
                             <div class="chat-avatar">
-                                {% if psi.usuario.fotoPerfil %}
-                                    <img src="{{ psi.usuario.fotoPerfil.url }}" alt="Dr. {{ psi.usuario.nombrePila }}">
-                                {% else %}
-                                    <img src="/static/img/default.png" alt="Dr. {{ psi.usuario.nombrePila }}">
-                                {% endif %}
+                                <img src="{% if psi.usuario.fotoPerfil %}{{ psi.usuario.fotoPerfil.url }}{% else %}/static/img/default.png{% endif %}">
                             </div>
+                            
                             <div class="chat-info">
                                 <div class="chat-info-top">
                                     <span class="chat-name">Dr. {{ psi.usuario.nombrePila }}</span>
-                                    <span class="chat-time">10:30 AM</span> </div>
-                                <div class="chat-last-msg">Haz clic para ver la conversación...</div>
+                                    <span class="chat-time">{{ psi.ultima_hora|time:"g:i A" }}</span>
+                                </div>
+                                <div class="chat-last-msg">
+                                    {% if psi.yo_lo_envie %}<span class="tu-prefix">Tú: </span>{% endif %}
+                                    <span class="msg-content">{{ psi.ultimo_texto|truncatechars:25 }}</span>
+                                </div>
                             </div>
                         </li>
-                        {% empty %}
-                        <li class="chat-empty">No tienes citas con psicólogos para chatear.</li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -331,7 +412,17 @@
                 
                 <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 40px; text-align: center; color: white;">
                     <div style="position: relative; display: inline-block;">
-                        <img src="{{ user.fotoPerfil.url }}" style="width: 120px; height: 120px; border-radius: 50%; border: 4px solid white; object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                        <img id="img-perfil-preview" src="{{ user.fotoPerfil.url }}" style="width: 120px; height: 120px; border-radius: 50%; border: 4px solid white; object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                        
+                        <label for="input-foto" style="position: absolute; bottom: 0; right: 0; background: white; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: 0.3s;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4facfe" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        </label>
+
+                        <form id="form-cambiar-foto" method="POST" enctype="multipart/form-data" style="display: none;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="cambiar_foto">
+                            <input type="file" id="input-foto" name="nueva_foto" accept="image/*" onchange="subirFotoPerfil()">
+                        </form>
                     </div>
                     <h2 style="margin: 15px 0 5px 0;">{{ user.nombrePila }} {{ user.primerApellido }}</h2>
                     <p style="opacity: 0.9; margin: 0;">Paciente de Free You Mind</p>

@@ -1028,6 +1028,38 @@ def panel_psicologos(request):
 def paciente(request):
     # 1. Obtener instancia del paciente
     paciente_instancia = get_object_or_404(Paciente, usuario=request.user)
+    ahora = timezone.now()
+
+    # --- LÓGICA PARA EL DASHBOARD ---
+    
+    # 1. Próxima cita (la más cercana a partir de ahora, que esté Pendiente)
+    proxima_cita = Cita.objects.filter(
+        paciente=paciente_instancia,
+        estado__nombre='Pendiente',
+        fecha__gte=ahora.date()
+    ).order_by('fecha', 'hora').first()
+
+    # 2. Siguientes 3 citas (después de la proxima_cita)
+    siguientes_citas = []
+    if proxima_cita:
+        siguientes_citas = Cita.objects.filter(
+            paciente=paciente_instancia,
+            estado__nombre='Pendiente'
+        ).exclude(numero=proxima_cita.numero).order_by('fecha', 'hora')[:3]
+    
+    # 3. Sesiones Realizadas (Citas con estado 'Atendida' o 'Completada')
+    # Ajusta el nombre del estado según tu base de datos
+    conteo_atendidas = Cita.objects.filter(
+        paciente=paciente_instancia, 
+        estado_id=2 
+    ).count()
+
+    ultimos_mensajes = []
+
+    mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+    ultimos_mensajes = Mensaje.objects.filter(
+        conversacion_id__in=mis_convs
+    ).exclude(usuario=request.user).select_related('usuario').order_by('-fechaEnvio')[:3]
     
     # --- PROCESAMIENTO DE FORMULARIOS (POST) ---
     if request.method == 'POST':
@@ -1117,13 +1149,43 @@ def paciente(request):
 
             messages.success(request, "Tus datos se han actualizado correctamente.")
             return redirect('/paciente/')
+        elif action == 'cambiar_foto':
+            nueva_foto = request.FILES.get('nueva_foto')
+            if nueva_foto:
+                # 1. Eliminar la foto anterior físicamente (opcional pero recomendado para no llenar el server)
+                if request.user.fotoPerfil and request.user.fotoPerfil.name != 'default.png':
+                    request.user.fotoPerfil.delete(save=False)
+                    
+                # 2. Asignar la nueva y guardar
+                request.user.fotoPerfil = nueva_foto
+                request.user.save()
+                messages.success(request, "¡Tu foto de perfil ha sido actualizada!")
+            else:
+                messages.error(request, "No se seleccionó ninguna imagen.")
+            return redirect('/paciente/')
 
     # --- CARGA DE DATOS PARA LA INTERFAZ ---
     citas_queryset = Cita.objects.filter(paciente=paciente_instancia).order_by('-fecha')
-    
-    # Lógica para Mensajería: Solo psicólogos con los que ha tenido cita
-    ids_usuarios_psicologos = citas_queryset.values_list('psicologo__usuario_id', flat=True).distinct()
-    mis_psicologos_chat = Psicologo.objects.filter(usuario_id__in=ids_usuarios_psicologos).select_related('usuario')
+    ids_psis = citas_queryset.values_list('psicologo__usuario_id', flat=True).distinct()
+    mis_psicologos_chat = Psicologo.objects.filter(usuario_id__in=ids_psis).select_related('usuario')
+
+    for psi in mis_psicologos_chat:
+        # Buscamos la conversación común
+        mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+        relacion = ConvUsuario.objects.filter(conversacion_id__in=mis_convs, usuario_id=psi.usuario.numero).first()
+        
+        if relacion:
+            ultimo_msg = Mensaje.objects.filter(conversacion=relacion.conversacion).order_by('-fechaEnvio').first()
+            if ultimo_msg:
+                # Añadimos atributos dinámicos para el HTML
+                psi.ultimo_texto = ultimo_msg.contenido
+                psi.ultima_hora = ultimo_msg.fechaEnvio
+                psi.yo_lo_envie = (ultimo_msg.usuario == request.user)
+                # Solo está "no leído" si el último mensaje lo envió el OTRO y leido es False
+                psi.sin_leer = (not ultimo_msg.leido and ultimo_msg.usuario != request.user)
+        else:
+            psi.ultimo_texto = "Sin mensajes aún"
+            psi.sin_leer = False
     
     hoy = date.today()
     nacimiento = paciente_instancia.fechaNacimiento
@@ -1134,11 +1196,14 @@ def paciente(request):
     telefono = telefono_obj.numTel if telefono_obj else "No registrado"
 
     contexto = {
+        'proxima_cita': proxima_cita,
+        'siguientes_citas': siguientes_citas,
+        'conteo_sesiones': conteo_atendidas,
+        'ultimos_mensajes': ultimos_mensajes,
         'psicologos': Psicologo.objects.all(), # Para el modal de agendar
         'servicios': Servicio.objects.filter(especialidad__isnull=False), # Asegúrate de enviar esto
         'mis_psicologos': mis_psicologos_chat, # Para la lista de mensajes
         'citas': citas_queryset,
-        'conteo_sesiones': citas_queryset.count(),
         'proxima_cita': citas_queryset.filter(fecha__gte=timezone.now().date()).last(),
         'user': request.user,
         'paciente': paciente_instancia,
@@ -1172,12 +1237,24 @@ def obtener_mensajes_paciente(request):
     mensajes_queryset = Mensaje.objects.filter(
         conversacion=relacion_comun.conversacion
     ).order_by('fechaEnvio')
+
+    # 3. Marcar mensajes del psicólogo como leídos
+    Mensaje.objects.filter(
+        conversacion=relacion_comun.conversacion,
+        leido=False
+    ).exclude(usuario=request.user).update(leido=True)
     
-    data = [{
-        'texto': m.contenido,
-        'tipo': 'sent' if m.usuario == request.user else 'received',
-        'hora': m.fechaEnvio.strftime('%H:%M'),
-    } for m in mensajes_queryset]
+    data = []
+    for m in mensajes_queryset:
+        hora_local = timezone.localtime(m.fechaEnvio)
+        data.append({
+            'texto': m.contenido,
+            'tipo': 'sent' if m.usuario == request.user else 'received',
+            'hora': hora_local.strftime('%I:%M %p'),
+            'fecha_completa': hora_local.strftime('%Y-%m-%d'), # Formato para comparar: 2026-04-15
+            'dia_str': hora_local.strftime('%d de %B, %Y'), # Formato legible
+            'leido': m.leido
+        })
         
     return JsonResponse(data, safe=False)
 

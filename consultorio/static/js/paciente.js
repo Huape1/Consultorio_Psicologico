@@ -5,41 +5,110 @@ let psicologoSeleccionadoId = null;
 async function seleccionarChatPsicologo(id, nombreCompleto, event) {
     psicologoSeleccionadoId = id;
 
-    // UI: Cambiar encabezado
+    // UI: Quitar negritas visualmente al hacer clic
+    const item = event.currentTarget;
+    if (item) {
+        item.classList.remove('unread');
+    }
+
     document.getElementById('chat-header').innerHTML = ` Dr. ${nombreCompleto}`;
     document.getElementById('receptor_id').value = id;
     document.getElementById('form-chat-paciente').style.display = 'block';
 
-    // UI: Resaltar (ahora usando el event que pasamos)
     document.querySelectorAll('#lista-psicologos-chat li').forEach(el => el.style.background = 'transparent');
     if (event && event.currentTarget) {
         event.currentTarget.style.background = '#e0f4ff';
     }
 
-    // AHORA SÍ hará la petición
     actualizarMensajesPaciente();
+}
+
+// Modificación en el setInterval para actualizar también la lista lateral
+async function refrescarListaLateral() {
+    // Aquí podrías hacer un fetch pequeño a una vista que solo devuelva 
+    // el estado de los últimos mensajes para actualizar la sidebar sin recargar.
+    // Por ahora, actualizarMensajesPaciente() ya marca como leído en el servidor.
+}
+
+function seleccionarChatYIr(id, nombre) {
+    // 1. Cambiamos a la sección de mensajes
+    showSection('mensajes');
+    
+    // 2. Buscamos el elemento en la lista de la izquierda del chat para "hacerle clic"
+    const chatItem = document.querySelector(`.chat-item[onclick*="'${id}'"]`);
+    if (chatItem) {
+        chatItem.click();
+    } else {
+        // Si por alguna razón no está en la lista visible, forzamos la selección
+        seleccionarChatPsicologo(id, nombre);
+    }
 }
 
 async function actualizarMensajesPaciente() {
     if (!psicologoSeleccionadoId) return;
-
     const contenedor = document.getElementById('chat-box-paciente');
 
     try {
         const response = await fetch(`/obtener_mensajes_paciente/?psicologo_id=${psicologoSeleccionadoId}`);
         const mensajes = await response.json();
 
-        contenedor.innerHTML = ''; // Limpiar
+        contenedor.innerHTML = ''; 
+        let ultimaFecha = null;
+
         mensajes.forEach(msg => {
+            // LÓGICA DEL SEPARADOR DE FECHA
+            if (msg.fecha_completa !== ultimaFecha) {
+                const divisor = document.createElement('div');
+                divisor.className = 'chat-date-separator';
+                
+                // Configuración de fechas para comparación
+                const fechaMensaje = new Date(msg.fecha_completa + "T00:00:00");
+                const hoy = new Date();
+                hoy.setHours(0, 0, 0, 0);
+                
+                const ayer = new Date();
+                ayer.setDate(ayer.getDate() - 1);
+                ayer.setHours(0, 0, 0, 0);
+
+                let textoFecha = msg.dia_str;
+
+                // Comparación lógica
+                if (fechaMensaje.getTime() === hoy.getTime()) {
+                    textoFecha = "Hoy";
+                } else if (fechaMensaje.getTime() === ayer.getTime()) {
+                    textoFecha = "Ayer";
+                }
+
+                divisor.innerHTML = `<span>${textoFecha}</span>`;
+                contenedor.appendChild(divisor);
+                ultimaFecha = msg.fecha_completa;
+            }
+
+            // CREACIÓN DEL MENSAJE (Tu estructura actual mejorada)
             const div = document.createElement('div');
-            div.className = `message ${msg.tipo}`; // 'sent' o 'received'
-            div.innerHTML = `<div>${msg.texto}</div><small>${msg.hora}</small>`;
+            div.className = `message ${msg.tipo}`;
+            
+            let statusHTML = '';
+            if (msg.tipo === 'sent') {
+                const color = msg.leido ? '#01EEFF' : '#ffffff';
+                statusHTML = `<span style="color: ${color}; font-size: 13px; margin-left: 4px; line-height: 1;">
+                                ${msg.leido ? '✓✓' : '✓'}
+                              </span>`;
+            }
+
+            div.innerHTML = `
+                <div style="display: flex; flex-direction: column;">
+                    <div class="msg-text">${msg.texto}</div>
+                    <div class="msg-meta" style="display: flex; align-items: center; justify-content: flex-end; gap: 2px; margin-top: 2px;">
+                        <small style="font-size: 10px; opacity: 0.8;">${msg.hora}</small>
+                        ${statusHTML}
+                    </div>
+                </div>
+            `;
             contenedor.appendChild(div);
         });
         contenedor.scrollTop = contenedor.scrollHeight;
-    } catch (e) {
-        console.error("Error al cargar mensajes:", e);
-    }
+    } catch (e) { console.error(e); }
 }
 
 // Manejo del Envío
@@ -118,15 +187,15 @@ document.getElementById("perfilEmail").value=savedUser.email;
 
 function showSection(id){
 
-document.querySelectorAll(".section").forEach(sec=>{
-sec.classList.remove("active");
-});
+    document.querySelectorAll(".section").forEach(sec=>{
+        sec.classList.remove("active");
+    });
 
-const section=document.getElementById(id);
+    const section=document.getElementById(id);
 
-if(section){
-section.classList.add("active");
-}
+    if(section){
+        section.classList.add("active");
+    }
 
 }
 
@@ -483,35 +552,12 @@ document.getElementById("contadorMensajes").innerText=mensajes.length;
    FOTO PERFIL
 ======================= */
 
-function mostrarImagen(event){
-
-const archivo=event.target.files[0];
-
-if(!archivo) return;
-
-const reader=new FileReader();
-
-reader.onload=function(e){
-
-const preview=document.getElementById("preview");
-
-if(preview){
-preview.src=e.target.result;
-}
-
-localStorage.setItem("fotoPerfil",e.target.result);
-
-}
-
-reader.readAsDataURL(archivo);
-
-}
-
-
-const foto=localStorage.getItem("fotoPerfil");
-
-if(foto && document.getElementById("preview")){
-document.getElementById("preview").src=foto;
+function subirFotoPerfil() {
+    const input = document.getElementById('input-foto');
+    if (input.files && input.files[0]) {
+        // Opcional: Mostrar una alerta de "Cargando..."
+        document.getElementById('form-cambiar-foto').submit();
+    }
 }
 
 

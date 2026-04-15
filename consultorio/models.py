@@ -103,6 +103,7 @@ class Mensaje(models.Model):
     contenido = models.TextField()
     conversacion = models.ForeignKey(Conversacion, on_delete=models.CASCADE)
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    leido = models.BooleanField(default=False)
 
 
 # ========================

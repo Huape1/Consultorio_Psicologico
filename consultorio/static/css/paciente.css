@@ -62,7 +62,15 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr; /* Una columna ancha y una estrecha */
+    grid-template-rows: auto auto;
+    gap: 25px;
+}
+
 /* --- Tarjetas de Resumen (Inicio) --- */
+
 .cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -165,6 +173,13 @@ button:hover {
     border: 1px solid #eee;
 }
 
+.card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
 .chat-sidebar-header {
     padding: 25px 20px 15px 20px;
     background: #fff;
@@ -236,6 +251,28 @@ button:hover {
     cursor: pointer;
     transition: background 0.2s;
     border-bottom: 1px solid #f9f9f9;
+}
+
+/* Mensaje no leído: Texto oscuro y negritas */
+.chat-item.unread .chat-last-msg {
+    font-weight: 800;
+    color: #1a1a1a;
+}
+
+.chat-item.unread .chat-name {
+    font-weight: 700;
+}
+
+/* Mensaje leído o enviado por mí: Gris claro */
+.chat-item .chat-last-msg {
+    font-weight: 400;
+    color: #888;
+    font-size: 0.85rem;
+}
+
+.tu-prefix {
+    color: #0FA3B1; /* Un color distintivo para el "Tú:" */
+    font-weight: bold;
 }
 
 .chat-item:hover {
@@ -348,9 +385,27 @@ button:hover {
     word-wrap: break-word;
 }
 
+.message-info {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end; /* Lo pega a la derecha */
+    margin-top: 2px;
+    gap: 2px;
+}
+
+.message-time {
+    font-size: 0.75rem;
+    opacity: 0.8;
+}
+
+.message-bubble {
+    display: flex;
+    flex-direction: column;
+}
+
 .message.sent {
     align-self: flex-end;
-    background: #0bafe5;
+    background: #0d88b0;
     color: white;
     border-bottom-right-radius: 2px;
 }
@@ -362,12 +417,52 @@ button:hover {
     border-bottom-left-radius: 2px;
 }
 
+.message.sent .message-bubble {
+    color: white;
+}
+
+.message.received .message-bubble {
+    color: #333;
+}
+
+/* Quita el margen que tenía el small original si lo pusiste en el CSS general */
 .message small {
-    display: block;
-    font-size: 0.7rem;
-    margin-top: 5px;
-    opacity: 0.8;
-    text-align: right;
+    margin: 0;
+}
+
+.chat-date-separator {
+    text-align: center;
+    margin: 20px 0;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.chat-date-separator span {
+    background-color: #DEF7FE; /* Color suave de tu paleta */
+    color: #264653; /* Color oscuro de tu paleta */
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    text-transform: capitalize;
+}
+
+/* Opcional: una línea que cruza por detrás */
+.chat-date-separator::before {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 1px;
+    background-color: #e0e0e0;
+    z-index: 0;
+}
+
+.chat-date-separator span {
+    position: relative;
+    z-index: 1;
 }
 
 .nav-item {
@@ -766,4 +861,135 @@ button:hover {
     /* Estiliza el select de hora para que no parezca un input normal */
 }
 
+/* Próxima cita grande */
+.main-appointment-card {
+    grid-row: span 1;
+}
 
+.display-date {
+    font-size: 3rem;
+    color: #0FA3B1;
+    margin: 10px 0;
+}
+
+.appointment-details-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    margin-bottom: 20px;
+}
+
+.appointment-details-grid label {
+    display: block;
+    color: #666;
+    font-size: 0.85em;
+}
+
+/* Listas mini */
+.mini-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.mini-date {
+    background: #DEF7FE;
+    padding: 5px 10px;
+    border-radius: 8px;
+    text-align: center;
+    min-width: 50px;
+}
+
+.display-number {
+    font-size: 2.5rem;
+    color: #264653;
+    margin: 10px 0;
+}
+
+/* Botones estilo imagen */
+.btn-primary {
+    background: #0FA3B1;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 2px solid #DEF7FE;
+    color: #0FA3B1;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.badge-count {
+    background: #0FA3B1;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.8em;
+}
+
+.msg-preview-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px;
+    border-radius: 10px;
+    transition: background 0.3s;
+    cursor: pointer;
+    margin-bottom: 5px;
+}
+
+.msg-preview-item:hover {
+    background: #f4fbfc;
+}
+
+.msg-preview-avatar img, .avatar-placeholder {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.avatar-placeholder {
+    background: #DEF7FE;
+    color: #0FA3B1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.msg-preview-content {
+    flex: 1;
+    overflow: hidden;
+}
+
+.msg-preview-top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9em;
+}
+
+.msg-text-truncate {
+    font-size: 0.85em;
+    color: #666;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.btn-link-full {
+    width: 100%;
+    background: none;
+    border: none;
+    color: #0FA3B1;
+    font-weight: bold;
+    padding-top: 15px;
+    cursor: pointer;
+    text-align: center;
+}
