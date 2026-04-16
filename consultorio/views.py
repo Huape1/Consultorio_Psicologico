@@ -14,11 +14,15 @@ from django.contrib import messages
 from django.db.models import Q, Count
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import authenticate
 import json
 from django.http import JsonResponse
 from django.contrib.auth import get_user_model
+from .serializers import PacienteDashboardSerializer
 import locale
 try:
     locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8') # O 'es_ES' según tu server
@@ -717,109 +721,6 @@ def tu_vista_admin(request):
     }
     return render(request, 'admin.html', context)
 
-#flutter
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-import json
-
-@csrf_exempt
-def api_login(request):
-    if request.method == 'POST':
-        # Flutter envía JSON, así que lo leemos así:
-        try:
-            data = json.loads(request.body)
-            correo_login = data.get('correo')
-            password_login = data.get('password')
-        except:
-            # Si mandas los datos como Form Data en lugar de JSON
-            correo_login = request.POST.get('correo')
-            password_login = request.POST.get('password')
-
-        user = authenticate(request, username=correo_login, password=password_login)
-
-        if user is not None:
-            estado = getattr(user.estadoCuenta, 'nombre', user.estadoCuenta)
-            
-            if str(estado).lower() != 'activo':
-                return JsonResponse({'error': 'Cuenta inactiva'}, status=403)
-
-            # En lugar de auth_login (que es para sesiones de navegador), 
-            # simplemente devolvemos los datos del usuario.
-            return JsonResponse({
-                'token': 'session_token_temporal', # Aquí luego pondremos un JWT real
-                'user': {
-                    'numero': user.numero,
-                    'nombrePila': user.nombrePila,
-                    'primerApellido': user.primerApellido,
-                    'segundoApellido': user.segundoApellido,
-                    'correo': user.correo,
-                    'tipoUsuario': user.tipoUsuario_id,
-                    'genero': user.genero,
-                }
-            }, status=200)
-        else:
-            return JsonResponse({'error': 'Credenciales inválidas'}, status=401)
-            
-    return JsonResponse({'error': 'Método no permitido'}, status=405)
-
-@csrf_exempt
-def api_registro_paciente(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            
-            # Validación rápida de campos obligatorios
-            if not data.get('fecha_nacimiento'):
-                return JsonResponse({'error': 'La fecha de nacimiento es obligatoria'}, status=400)
-
-            with transaction.atomic():
-                # 1. Obtenemos las llaves foráneas necesarias
-                # Asegúrate de que los nombres coincidan exactamente con tu BD
-                tipo_paciente = TipoUsuario.objects.get(clave=1)
-                estado_activo = EdoCuenta.objects.get(nombre__icontains='Activo') 
-                
-                # 2. Crear el Usuario
-                usuario = Usuario.objects.create(
-                    nombrePila=data.get('nombre'),
-                    primerApellido=data.get('primer_apellido'),
-                    segundoApellido=data.get('segundo_apellido', ''),
-                    genero=data.get('genero'),
-                    correo=data.get('correo'),
-                    password=make_password(data.get('password')),
-                    tipoUsuario=tipo_paciente,
-                    estadoCuenta=estado_activo
-                )
-
-                # 3. Crear el registro de Paciente con la FECHA
-                Paciente.objects.create(
-                    usuario=usuario,
-                    fechaNacimiento=data.get('fecha_nacimiento') # Formato YYYY-MM-DD
-                )
-
-                # 4. Crear el Teléfono
-                telefono_data = data.get('telefono')
-                if telefono_data:
-                    Telefono.objects.create(
-                        numTel=telefono_data,
-                        usuario=usuario
-                    )
-
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Registro exitoso y cuenta activa'
-            }, status=201)
-
-        except TipoUsuario.DoesNotExist:
-            return JsonResponse({'error': 'Error de configuración: Tipo de usuario no encontrado'}, status=500)
-        except EdoCuenta.DoesNotExist:
-            return JsonResponse({'error': 'Error de configuración: Estado de cuenta "Activo" no encontrado'}, status=500)
-        except Exception as e:
-            # Imprime el error en la consola de Django para debuguear mejor
-            print(f"Error en registro: {e}")
-            return JsonResponse({'error': str(e)}, status=400)
-
-    return JsonResponse({'error': 'Método no permitido'}, status=405)
-
 @csrf_exempt
 @require_POST
 @login_required
@@ -1388,3 +1289,693 @@ def api_psicologos_disponibles(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+    
+
+# FLUTTER
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_login(request):
+    correo = request.data.get('correo')
+    password = request.data.get('password')
+    user = authenticate(username=correo, password=password)
+    
+    if user is not None:
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({
+            'token': token.key, # <--- ¡VITAL!
+            'user': { # <--- Envolvemos en 'user' para que Flutter lo encuentre
+                'numero': user.pk,
+                'nombrePila': user.nombrePila,
+                'correo': user.correo,
+                'tipoUsuario': user.tipoUsuario.pk if user.tipoUsuario else 1,
+            }
+        }, status=200)
+    else:
+        return Response({'error': 'Credenciales inválidas'}, status=401)
+
+@csrf_exempt
+def api_registro_paciente(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            
+            # Validación rápida de campos obligatorios
+            if not data.get('fecha_nacimiento'):
+                return JsonResponse({'error': 'La fecha de nacimiento es obligatoria'}, status=400)
+
+            with transaction.atomic():
+                # 1. Obtenemos las llaves foráneas necesarias
+                # Asegúrate de que los nombres coincidan exactamente con tu BD
+                tipo_paciente = TipoUsuario.objects.get(clave=1)
+                estado_activo = EdoCuenta.objects.get(nombre__icontains='Activo') 
+                
+                # 2. Crear el Usuario
+                usuario = Usuario.objects.create(
+                    nombrePila=data.get('nombre'),
+                    primerApellido=data.get('primer_apellido'),
+                    segundoApellido=data.get('segundo_apellido', ''),
+                    genero=data.get('genero'),
+                    correo=data.get('correo'),
+                    password=make_password(data.get('password')),
+                    tipoUsuario=tipo_paciente,
+                    estadoCuenta=estado_activo
+                )
+
+                # 3. Crear el registro de Paciente con la FECHA
+                Paciente.objects.create(
+                    usuario=usuario,
+                    fechaNacimiento=data.get('fecha_nacimiento') # Formato YYYY-MM-DD
+                )
+
+                # 4. Crear el Teléfono
+                telefono_data = data.get('telefono')
+                if telefono_data:
+                    Telefono.objects.create(
+                        numTel=telefono_data,
+                        usuario=usuario
+                    )
+
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Registro exitoso y cuenta activa'
+            }, status=201)
+
+        except TipoUsuario.DoesNotExist:
+            return JsonResponse({'error': 'Error de configuración: Tipo de usuario no encontrado'}, status=500)
+        except EdoCuenta.DoesNotExist:
+            return JsonResponse({'error': 'Error de configuración: Estado de cuenta "Activo" no encontrado'}, status=500)
+        except Exception as e:
+            # Imprime el error en la consola de Django para debuguear mejor
+            print(f"Error en registro: {e}")
+            return JsonResponse({'error': str(e)}, status=400)
+
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+# FLUTTER - ADMINISTRADOR
+
+#Panel pirncipal
+@csrf_exempt
+def api_admin_stats(request):
+    # 1. Conteos
+    stats = {
+        'activePsychologists': Psicologo.objects.count(),
+        'registeredPatients': Paciente.objects.count(),
+        'pendingMessages': Mensaje.objects.filter(leido=False).count(),
+        'todayAppointments': Cita.objects.filter(fecha=datetime.date.today()).count(),
+    }
+    
+    # 2. Últimos 3 mensajes
+    mensajes = Mensaje.objects.select_related('usuario').order_by('-fechaEnvio')[:3]
+    stats['recentMessages'] = [{
+        'user': f"{m.usuario.nombrePila} {m.usuario.primerApellido}",
+        'content': m.contenido,
+        'timestamp': m.fechaEnvio.strftime('%H:%M'),
+        'isHigh': not m.leido # Marcamos como "importante" si no se ha leído
+    } for m in mensajes]
+    
+    # 3. Lista de Administradores (Rol 3)
+    admins = Usuario.objects.filter(tipoUsuario__clave=3)
+    stats['adminList'] = [{
+        'fullName': f"{a.nombrePila} {a.primerApellido}",
+        'role': 'Administrador del Sistema',
+        'status': 'online' if a.is_active else 'offline'
+    } for a in admins]
+
+    return JsonResponse(stats)
+    
+def api_ultimos_mensajes(request):
+    # Traemos los últimos 5 mensajes con info del usuario que los envió
+    mensajes = Mensaje.objects.select_related('usuario').order_by('-fechaEnvio')[:5]
+    data = [{
+        'user': f"{m.usuario.nombrePila} {m.usuario.primerApellido}",
+        'content': m.contenido,
+        'timestamp': m.fechaEnvio.strftime('%H:%M'), # Solo hora para el dashboard
+        'isRead': m.leido
+    } for m in mensajes]
+    return JsonResponse(data, safe=False)
+
+#Panel psicólogos
+
+def api_get_psychologists(request):
+    try:
+        usuarios_psicologos = Usuario.objects.filter(tipoUsuario__clave=2)
+        data = []
+        for u in usuarios_psicologos:
+            info_psicologo = Psicologo.objects.filter(usuario=u).first()
+            tel_obj = Telefono.objects.filter(usuario=u).first()
+            
+            # Construir URL de la imagen
+            foto_url = None
+            if u.fotoPerfil:
+                foto_url = request.build_absolute_uri(u.fotoPerfil.url)
+            
+            data.append({
+                "id": u.numero,
+                "fullName": f"{u.nombrePila} {u.primerApellido} {u.segundoApellido}",
+                "email": u.correo,
+                "photo": foto_url, # <--- Nueva clave con la URL
+                "specialty": info_psicologo.especialidad.nombre if info_psicologo else "General",
+                "phone": tel_obj.numTel if tel_obj else "Sin teléfono",
+                "license": info_psicologo.cedula if info_psicologo else "N/A",
+            })
+            
+        return JsonResponse(data, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+    
+@transaction.atomic
+def api_create_psychologist(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        
+        # 1. Crear Usuario con la password del formulario
+        nuevo_usuario = Usuario.objects.create_user(
+            correo=data['email'],
+            password=data['password'], # Usamos la password enviada
+            nombrePila=data['nombre'],
+            primerApellido=data['apellido1'],
+            segundoApellido=data.get('apellido2', ''),
+            genero=data['genero'],
+            tipoUsuario=TipoUsuario.objects.get(clave=2),
+            estadoCuenta=EdoCuenta.objects.get(nombre="Activo")
+        )
+
+        # 2. Crear Teléfono (según tu modelo Telefono)
+        Telefono.objects.create(
+            numTel=data['telefono'],
+            usuario=nuevo_usuario
+        )
+
+        # 3. Crear Perfil de Psicólogo
+        Psicologo.objects.create(
+            usuario=nuevo_usuario,
+            cedula=data['cedula'],
+            especialidad_id=data['especialidad_id']
+        )
+
+        return JsonResponse({"status": "ok"})
+
+def api_get_specialties(request):
+    especialidades = Especialidad.objects.filter(activo=True)
+    data = [{"clave": e.clave, "nombre": e.nombre} for e in especialidades]
+    return JsonResponse(data, safe=False)
+
+@csrf_exempt
+@transaction.atomic
+def api_update_psychologist(request, pk):
+    if request.method == 'POST': # O PUT si tu ApiService lo soporta
+        try:
+            data = json.loads(request.body)
+            usuario = Usuario.objects.get(numero=pk)
+            
+            # 1. Actualizar Usuario
+            usuario.nombrePila = data['nombre']
+            usuario.primerApellido = data['apellido1']
+            usuario.segundoApellido = data['apellido2']
+            usuario.correo = data['email']
+            usuario.genero = data['genero']
+            if data.get('password'): # Solo si se envió una nueva
+                usuario.set_password(data['password'])
+            usuario.save()
+
+            # 2. Actualizar Teléfono
+            tel_obj = Telefono.objects.filter(usuario=usuario).first()
+            if tel_obj:
+                tel_obj.numTel = data['telefono']
+                tel_obj.save()
+            else:
+                Telefono.objects.create(numTel=data['telefono'], usuario=usuario)
+
+            # 3. Actualizar Perfil Psicólogo
+            psico_profile = Psicologo.objects.get(usuario=usuario)
+            psico_profile.cedula = data['cedula']
+            psico_profile.especialidad_id = data['especialidad_id']
+            psico_profile.save()
+
+            return JsonResponse({"message": "Actualizado con éxito"})
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+
+#Panel Horarios
+def api_get_schedules(request):
+    try:
+        # Obtenemos todos los horarios de la base de datos
+        horarios = Horario.objects.all().order_by('numero')
+        
+        data = []
+        for h in horarios:
+            data.append({
+                "id": h.numero,        # Usamos 'numero' porque es tu PK
+                "name": h.nombre,
+                "days": h.dias,
+                "hours": h.horas,
+                "icon": h.icono,
+                "status": "Activo" if h.activo else "Inactivo"
+            })
+            
+        # Importante: safe=False permite enviar una LISTA en lugar de un OBJETO
+        return JsonResponse(data, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+@csrf_exempt
+def api_manage_schedule(request, pk=None):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        if pk: # EDITAR
+            h = Horario.objects.get(numero=pk)
+        else: # CREAR
+            h = Horario()
+        
+        h.nombre = data['name']
+        h.dias = data['days']
+        h.horas = data['hours']
+        h.icono = data.get('icon', 'sun')
+        h.activo = data.get('status') == "Activo"
+        h.save()
+        
+        return JsonResponse({"status": "ok"})
+    
+#Panel adminstradores
+def api_get_admins(request):
+    # Filtramos por tipoUsuario clave 3 (Administradores)
+    admins = Usuario.objects.filter(tipoUsuario__clave=3).order_by('numero')
+    
+    data = []
+    for a in admins:
+        foto_url = request.build_absolute_uri(a.fotoPerfil.url) if a.fotoPerfil else None
+        data.append({
+            "id": a.numero,
+            "nombre": a.nombrePila,
+            "apellido1": a.primerApellido,
+            "apellido2": a.segundoApellido,
+            "fullName": f"{a.nombrePila} {a.primerApellido} {a.segundoApellido}",
+            "email": a.correo,
+            "genero": a.genero,
+            "phone": Telefono.objects.filter(usuario=a).first().numTel if Telefono.objects.filter(usuario=a).exists() else "",
+            "photo": foto_url,
+            "status": a.estadoCuenta.nombre if a.estadoCuenta else "Inactivo"
+        })
+    return JsonResponse(data, safe=False)
+
+@csrf_exempt
+@transaction.atomic
+def api_manage_admin(request, pk=None):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        
+        # Si pk es 0 o None, creamos uno nuevo
+        if pk and pk != 0:
+            user = Usuario.objects.get(numero=pk)
+        else:
+            # IMPORTANTE: Cambiado a clave 3 para coincidir con tu filtro de lista
+            user = Usuario(tipoUsuario=TipoUsuario.objects.get(clave=3))
+        
+        user.nombrePila = data['nombre']
+        user.primerApellido = data['apellido1']
+        user.segundoApellido = data.get('apellido2', '')
+        user.correo = data['email']
+        user.genero = data['genero']
+        
+        if data.get('status'):
+            # Buscamos el objeto EdoCuenta por nombre
+            estado = EdoCuenta.objects.filter(nombre=data['status']).first()
+            if estado:
+                user.estadoCuenta = estado
+        
+        if data.get('password') and data['password'].strip() != "":
+            user.set_password(data['password'])
+        
+        user.save()
+
+        if data.get('telefono'):
+            Telefono.objects.update_or_create(
+                usuario=user,
+                defaults={'numTel': data['telefono']}
+            )
+        
+        return JsonResponse({"status": "ok"})
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_profile(request):
+    user = request.user
+    # Intentamos obtener el teléfono si existe
+    tel = Telefono.objects.filter(usuario=user).first()
+    
+    return Response({
+        "full_name": f"{user.nombrePila} {user.primerApellido} {user.segundoApellido}",
+        "email": user.correo,
+        "phone": tel.numTel if tel else "",
+        "photo": request.build_absolute_uri(user.fotoPerfil.url) if user.fotoPerfil else None,
+        "role": user.tipoUsuario.nombre if user.tipoUsuario else "Administrador"
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_user_profile(request):
+    user = request.user
+    data = request.data
+    
+    # Actualizar nombre (ejemplo simple, puedes separar nombre de apellidos)
+    if 'full_name' in data:
+        nombres = data['full_name'].split(' ')
+        user.nombrePila = nombres[0]
+        if len(nombres) > 1:
+            user.primerApellido = nombres[1]
+        user.save()
+        
+    # Actualizar teléfono
+    if 'phone' in data:
+        Telefono.objects.update_or_create(
+            usuario=user, 
+            defaults={'numTel': data['phone']}
+        )
+        
+    return Response({"message": "Perfil actualizado"})
+
+#FLUTTER - PACIENTE
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_paciente_data(request):
+    try:
+        # Obtenemos el paciente asociado al usuario logueado
+        paciente = Paciente.objects.get(usuario=request.user)
+        serializer = PacienteDashboardSerializer(paciente)
+        return Response(serializer.data)
+    except Paciente.DoesNotExist:
+        return Response({'error': 'No eres un paciente'}, status=404)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_paciente_dashboard(request):
+    try:
+        # 1. Obtener Paciente
+        paciente = Paciente.objects.get(usuario=request.user)
+        usuario = request.user
+        
+        # 2. Calcular Edad
+        today = date.today()
+        edad = today.year - paciente.fechaNacimiento.year - (
+            (today.month, today.day) < (paciente.fechaNacimiento.month, paciente.fechaNacimiento.day)
+        )
+
+        # 3. Próxima Cita (Estado: Pendiente/Confirmada y fecha >= hoy)
+        proxima = Cita.objects.filter(
+            paciente=paciente, 
+            fecha__gte=today,
+            estado__nombre__in=['Pendiente', 'Confirmada']
+        ).order_by('fecha', 'hora').first()
+
+        proxima_data = None
+        if proxima:
+            proxima_data = {
+                "fecha": proxima.fecha.strftime("%Y-%m-%d"),
+                "hora": proxima.hora.strftime("%I:%M %p"),
+                "servicio_nombre": proxima.servicio.nombre,
+                "psicologo_nombre": f"{proxima.psicologo.usuario.nombrePila} {proxima.psicologo.usuario.primerApellido}",
+                "estado_nombre": proxima.estado.nombre
+            }
+
+        # 4. Contador de Sesiones (Citas con estado 'Atendido')
+        sesiones_count = Cita.objects.filter(paciente=paciente, estado__nombre='Atendido').count()
+
+        # 5. Últimos Mensajes
+        mensajes_qs = Mensaje.objects.filter(conversacion__convusuario__usuario=usuario).order_by('-fechaEnvio')[:2]
+        mensajes_list = []
+        for m in mensajes_qs:
+            mensajes_list.append({
+                "remitente": f"{m.usuario.nombrePila}",
+                "contenido": m.contenido,
+                "hora": m.fechaEnvio.strftime("%I:%M %p") if m.fechaEnvio.date() == today else m.fechaEnvio.strftime("%d/%m")
+            })
+
+        # 6. Respuesta final
+        return JsonResponse({
+            "nombre": f"{usuario.nombrePila} {usuario.primerApellido}",
+            "email": usuario.correo, # <--- AÑADE ESTO
+            "genero": usuario.genero,
+            "edad": edad,
+            "foto_perfil": request.build_absolute_uri(usuario.fotoPerfil.url) if usuario.fotoPerfil else None, # <--- AÑADE ESTO
+            "sesiones": sesiones_count,
+            "proxima_cita": proxima_data,
+            "mensajes": mensajes_list
+        })
+
+    except Paciente.DoesNotExist:
+        return JsonResponse({"error": "No encontrado"}, status=404)
+    
+# Pantalla de citas del paciente
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_mis_citas(request):
+    try:
+        paciente = Paciente.objects.get(usuario=request.user)
+        citas = Cita.objects.filter(paciente=paciente).order_by('-fecha', '-hora')
+        
+        citas_list = []
+        for c in citas:
+            citas_list.append({
+                "fecha": c.fecha.strftime("%d/%m/%Y"),
+                "hora": c.hora.strftime("%I:%M %p"),
+                "psicologo": f"{c.psicologo.usuario.nombrePila} {c.psicologo.usuario.primerApellido}",
+                "servicio": c.servicio.nombre,
+                "estado": c.estado.nombre # 'Pendiente', 'Confirmada', 'Atendido', 'Cancelada'
+            })
+            
+        return JsonResponse(citas_list, safe=False)
+    except Paciente.DoesNotExist:
+        return JsonResponse({"error": "Paciente no encontrado"}, status=404)
+    
+#Pantalla agendar cita del paciente
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_setup_agendar(request):
+    # Obtenemos psicólogos activos
+    psicologos = Psicologo.objects.all()
+    psis_data = [{
+        "id": p.numero,
+        "nombre": f"{p.usuario.nombrePila} {p.usuario.primerApellido}",
+        "especialidad": "Psicología Clínica", # O el campo que tengas
+        "foto": p.usuario.fotoPerfil.url if p.usuario.fotoPerfil else None
+    } for p in psicologos]
+
+    # Obtenemos servicios/tipos de terapia
+    servicios = Servicio.objects.all()
+    serv_data = [{
+        "id": s.clave,
+        "nombre": s.nombre,
+        "precio": 800 # O s.precio si tienes el campo
+    } for s in servicios]
+
+    return JsonResponse({"psicologos": psis_data, "servicios": serv_data})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def agendar_cita_api(request):
+    try:
+        paciente = Paciente.objects.get(usuario=request.user)
+        data = request.data
+        
+        # Obtenemos instancias necesarias
+        psicologo = Psicologo.objects.get(numero=data['psicologo_id'])
+        servicio = Servicio.objects.get(clave=data['servicio_id'])
+        modalidad, _ = Modalidad.objects.get_or_create(nombre=data['modalidad'])
+        estado_pend, _ = EdoCita.objects.get_or_create(nombre='Pendiente')
+
+        # Crear la cita
+        Cita.objects.create(
+            fecha=data['fecha'],
+            hora=data['hora'],
+            motivo=data.get('motivo', 'Consulta'),
+            psicologo=psicologo,
+            paciente=paciente,
+            servicio=servicio,
+            modalidad=modalidad,
+            estado=estado_pend
+        )
+        return Response({"status": "success", "message": "Cita agendada correctamente"})
+    except Exception as e:
+        return Response({"status": "error", "message": str(e)}, status=400)
+    
+#Pantalla Perfel
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_perfil_paciente(request):
+    usuario = request.user
+    paciente = Paciente.objects.get(usuario=usuario)
+    telefono_obj = Telefono.objects.filter(usuario=usuario).first()
+    
+    return JsonResponse({
+        "nombre": usuario.nombrePila,
+        "apellido": usuario.primerApellido,
+        "email": usuario.correo,
+        "telefono": telefono_obj.numTel if telefono_obj else "",
+        "foto_perfil": request.build_absolute_uri(usuario.fotoPerfil.url) if usuario.fotoPerfil else None,
+        "genero": usuario.genero,
+        "fecha_nacimiento": paciente.fechaNacimiento.strftime("%Y-%m-%d")
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def actualizar_perfil_api(request):
+    try:
+        usuario = request.user
+        data = request.data
+        
+        # Actualizar datos básicos del usuario
+        usuario.nombrePila = data.get('nombre', usuario.nombrePila)
+        usuario.primerApellido = data.get('apellido', usuario.primerApellido)
+        usuario.correo = data.get('email', usuario.correo)
+        usuario.save()
+        
+        # Actualizar teléfono
+        if 'telefono' in data:
+            telefono_obj, _ = Telefono.objects.get_or_create(usuario=usuario)
+            telefono_obj.numTel = data['telefono']
+            telefono_obj.save()
+            
+        return JsonResponse({"status": "success", "message": "Perfil actualizado"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    
+#FLUTTER - PSICÓLOGO
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def psicologo_dashboard(request):
+    # Obtener la instancia del psicólogo
+    psicologo = get_object_or_404(Psicologo, usuario=request.user)
+    hoy = timezone.now().date()
+
+    # 1. Estadísticas
+    citas_hoy = Cita.objects.filter(psicologo=psicologo, fecha=hoy)
+    pendientes = citas_hoy.filter(estado__nombre='Pendiente').count()
+    
+    # 2. Citas del día (formateadas para el ListView)
+    citas_lista = []
+    for c in citas_hoy.order_by('hora'):
+        citas_lista.append({
+            "id": c.numero,
+            "paciente_nombre": f"{c.paciente.usuario.nombrePila} {c.paciente.usuario.primerApellido}",
+            "hora": c.hora.strftime("%H:%M"),
+            "estado": c.estado.nombre,
+            "tipo": c.servicio.nombre,
+            "foto_paciente": request.build_absolute_uri(c.paciente.usuario.fotoPerfil.url) if c.paciente.usuario.fotoPerfil else None
+        })
+
+    return JsonResponse({
+        "nombre_psicologo": f"{request.user.nombrePila} {request.user.primerApellido}",
+        "stats": {
+            "total_hoy": citas_hoy.count(),
+            "pendientes": pendientes,
+            "mensajes": 3 # O conteo real de mensajes sin leer
+        },
+        "citas": citas_lista
+    })
+    
+#Pantalla de pacientes del psicólogo
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_mis_pacientes(request):
+    psicologo = get_object_or_404(Psicologo, usuario=request.user)
+    
+    # Obtenemos pacientes únicos que han tenido citas con este psicólogo
+    # Además contamos cuántas sesiones 'Realizadas' tienen
+    pacientes_qs = Paciente.objects.filter(cita__psicologo=psicologo).distinct()
+    
+    data = []
+    for p in pacientes_qs:
+        sesiones_count = Cita.objects.filter(
+            paciente=p, 
+            psicologo=psicologo, 
+            estado__nombre='Realizada'
+        ).count()
+        
+        data.append({
+            "id": p.numero,
+            "nombre_completo": f"{p.usuario.nombrePila} {p.usuario.primerApellido}",
+            "sesiones_completadas": sesiones_count,
+            "foto": request.build_absolute_uri(p.usuario.fotoPerfil.url) if p.usuario.fotoPerfil else None,
+        })
+        
+    return JsonResponse(data, safe=False)
+
+#Pantalla de agenda
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_agenda_diaria(request):
+    psicologo = get_object_or_404(Psicologo, usuario=request.user)
+    # Obtenemos la fecha de los parámetros: /api/psicologo/agenda/?fecha=2024-10-24
+    fecha_str = request.query_params.get('fecha')
+    
+    if fecha_str:
+        fecha_obj = dt.strptime(fecha_str, '%Y-%m-%d').date()
+    else:
+        fecha_obj = timezone.now().date()
+
+    citas = Cita.objects.filter(
+        psicologo=psicologo, 
+        fecha=fecha_obj
+    ).exclude(estado__nombre='Cancelada').order_by('hora')
+
+    data = []
+    for c in citas:
+        data.append({
+            "id": c.numero,
+            "hora": c.hora.strftime("%H:%M"),
+            "tipo": c.servicio.nombre,
+            "status": c.estado.nombre,
+            "paciente_nombre": f"{c.paciente.usuario.nombrePila} {c.paciente.usuario.primerApellido}",
+            "modalidad": "Virtual" if c.modalidad else "Presencial",
+            "duracion": "45 min" # O la duración real de tu modelo
+        })
+
+    return JsonResponse(data, safe=False)
+
+#Pantalla perfil
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_perfil_psicologo(request):
+    usuario = request.user
+    psicologo = get_object_or_404(Psicologo, usuario=usuario)
+    # Intentamos obtener el teléfono si existe
+    telefono = Telefono.objects.filter(usuario=usuario).first()
+    
+    return JsonResponse({
+        "nombre": usuario.nombrePila,          # Llave simple para el form
+        "apellido": usuario.primerApellido,    # Llave simple para el form
+        "nombre_completo": f"{usuario.nombrePila} {usuario.primerApellido}",
+        "email": usuario.correo,
+        "telefono": telefono.numTel if telefono else "",
+        "especialidad": psicologo.especialidad.nombre,
+        "foto_perfil": request.build_absolute_uri(usuario.fotoPerfil.url) if usuario.fotoPerfil else None,
+        "tipo_usuario": "Especialista"
+    })
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def actualizar_perfil_psicologo(request):
+    usuario = request.user
+    data = request.data
+    
+    try:
+        # Actualizamos los datos del usuario base
+        usuario.nombrePila = data.get('nombre', usuario.nombrePila)
+        usuario.primerApellido = data.get('apellido', usuario.primerApellido)
+        usuario.correo = data.get('email', usuario.correo)
+        usuario.save()
+        
+        # Si envías teléfono, se actualiza en la tabla Telefono
+        nuevo_tel = data.get('telefono')
+        if nuevo_tel:
+            # Buscamos el primer teléfono o creamos uno si no existe
+            tel_obj, created = Telefono.objects.get_or_create(usuario=usuario)
+            tel_obj.numTel = nuevo_tel
+            tel_obj.save()
+
+        return JsonResponse({"status": "success", "message": "Perfil actualizado"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=400)

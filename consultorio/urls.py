@@ -3,6 +3,8 @@ from . import views
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .api import UsuarioViewSet
+from django.conf import settings
+from django.conf.urls.static import static
 
 router = DefaultRouter()
 router.register(r'usuarios', UsuarioViewSet, basename='usuario')
@@ -45,4 +47,28 @@ urlpatterns = [
     path('enviar_mensaje_paciente/', views.enviar_mensaje_paciente, name='enviar_mensaje_paciente'),
     path('obtener_mensajes_paciente/', views.obtener_mensajes_paciente, name='obtener_mensajes_paciente'),
     path('api/psicologos-disponibles/', views.api_psicologos_disponibles, name='api_psicologos_disponibles'),
-]
+    #Flutter
+    path('admin/stats/', views.api_admin_stats),
+    path('api/admin/psychologists/', views.api_get_psychologists),
+    path('api/admin/psychologists/create/', views.api_create_psychologist),
+    path('admin/specialties/', views.api_get_specialties, name='api_get_specialties'),
+    path('api/admin/psychologists/update/<int:pk>/', views.api_update_psychologist),
+    path('api/admin/schedules/', views.api_get_schedules, name='api_get_schedules'),
+    path('api/admin/schedules/manage/<int:pk>/', views.api_manage_schedule, name='api_manage_schedule'),
+    path('api/admin/list-admins/', views.api_get_admins, name='api_get_admins'),
+    path('api/admin/manage-admin/<int:pk>/', views.api_manage_admin, name='api_manage_admin'),
+    path('api/auth/profile/', views.get_user_profile, name='get_profile'),
+    path('api/auth/profile/update/', views.update_user_profile, name='update_profile'),
+    path('api/paciente/dashboard/', views.get_paciente_dashboard, name='get_paciente_dashboard'),
+    path('paciente/perfil/', views.get_paciente_data, name='paciente_perfil'),
+    path('paciente/citas/', views.get_mis_citas),
+    path('paciente/setup-agendar/', views.get_setup_agendar),
+    path('paciente/agendar/', views.agendar_cita_api, name='agendar_cita'),
+    path('api/paciente/perfils/', views.get_perfil_paciente),
+    path('api/paciente/actualizar-perfil-api/', views.actualizar_perfil_api),
+    path('api/psicologo/dashboard/', views.psicologo_dashboard, name='psicologo_dashboard'),
+    path('api/psicologo/pacientes/', views.get_mis_pacientes), # Agregué api/
+    path('api/psicologo/agenda/', views.get_agenda_diaria, name='get_agenda_diaria'),
+    path('api/psicologo/perfil/', views.get_perfil_psicologo), # Agregué api/
+    path('api/psicologo/actualizar-perfil/', views.actualizar_perfil_psicologo), # Agregué api/
+]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
