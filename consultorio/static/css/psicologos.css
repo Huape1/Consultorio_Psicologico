@@ -256,89 +256,6 @@ tr:hover {
     color: white;
 }
 
-/* Chat box */
-.chat-box {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.chat-header {
-    padding: 15px;
-    border-bottom: 1px solid #e2e8f0;
-    font-weight: 600;
-}
-
-.chat-messages {
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-}
-
-.message {
-    max-width: 70%; /* Evita que la burbuja ocupe toda la pantalla */
-    padding: 8px 12px;
-    border-radius: 15px;
-    font-size: 14px;
-    position: relative;
-    line-height: 1.4;
-    word-wrap: break-word;
-}
-
-/* Mensajes que envías (Psicólogo) - Color Azul FYM o Verde */
-.message.sent {
-    align-self: flex-end; /* Lo empuja a la derecha */
-    background-color: #09173e; /* Azul principal de tu sistema */
-    color: black;
-    border-bottom-right-radius: 2px;
-}
-
-/* Mensajes que recibes (Paciente) - Gris claro */
-.message.received {
-    align-self: flex-start; /* Lo empuja a la izquierda */
-    background-color: #e2e8f0; /* Gris claro para diferenciar del fondo */
-    color: #3a3b45;
-    border-bottom-left-radius: 2px;
-}
-
-/* Estilo de la hora dentro del mensaje */
-.message-time {
-    display: block;
-    font-size: 10px;
-    margin-top: 4px;
-    opacity: 0.7;
-    text-align: right;
-}
-
-.message.sent .message-time {
-    color: #ffffff;
-}
-
-
-/* Chat input */
-.chat-input {
-    display: flex;
-    border-top: 1px solid #e2e8f0;
-}
-
-.chat-input input {
-    flex: 1;
-    padding: 12px;
-    border: none;
-}
-
-.chat-input button {
-    background: #2563eb;
-    color: white;
-    border: none;
-    padding: 0 20px;
-    cursor: pointer;
-}
-
-.chat-input button:hover {
-    background: #1d4ed8;
-}
-
 /* Cuenta */
 .account-section {
     background: white;
@@ -511,4 +428,308 @@ section {
     margin: 5% auto; /* Menos margen arriba para que quepa mejor */
     max-height: 90vh; /* Que no se pase del alto de la pantalla */
     overflow-y: auto; /* Scroll interno en el formulario si es necesario */
+}
+
+/* CHAT */
+
+/* --- CONTENEDOR PRINCIPAL --- */
+.card-chat-container {
+    display: flex;
+    height: 80vh; /* Ajusta según el espacio disponible */
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    border: 1px solid #eef2f6;
+}
+
+/* --- BARRA LATERAL (Sidebar) --- */
+.chat-sidebar {
+    width: 320px;
+    border-right: 1px solid #eef2f6;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+}
+
+.chat-sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid #eef2f6;
+}
+
+.chat-sidebar-header h3 {
+    margin: 0 0 15px 0;
+    font-size: 1.2rem;
+    color: #264653;
+}
+
+/* Caja de búsqueda */
+.search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: #f8fafc;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.search-box input {
+    border: none;
+    background: transparent;
+    margin-left: 8px;
+    outline: none;
+    width: 100%;
+    font-size: 0.9rem;
+}
+
+/* Lista de Items (Pacientes/Psicólogos) */
+#lista-pacientes-chat, #lista-psicologos-chat {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.chat-item {
+    display: flex;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 1px solid #f8fafc;
+    align-items: center;
+}
+
+.chat-item:hover {
+    background: #f1f9ff;
+}
+
+.chat-item.active-chat {
+    background: #e0f4ff;
+    border-left: 4px solid #3b82f6;
+}
+
+/* Estilo para mensajes no leídos (Negritas) */
+.chat-item.unread .chat-name,
+.chat-item.unread .msg-content {
+    font-weight: 700;
+    color: #000;
+}
+
+/* Avatares */
+.chat-avatar img {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 12px;
+}
+
+.chat-info {
+    flex: 1;
+    overflow: hidden;
+}
+
+.chat-info-top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.chat-name {
+    font-size: 0.95rem;
+    color: #334155;
+}
+
+.chat-time {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.chat-last-msg {
+    font-size: 0.85rem;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* --- ÁREA DE CHAT (Main) --- */
+.chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #f8fafc;
+}
+
+#chat-header-psico, #chat-header {
+    padding: 18px 25px;
+    background: #fff;
+    border-bottom: 1px solid #eef2f6;
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 1.1rem;
+}
+
+/* Contenedor de burbujas */
+#chat-box-psicologo, #chat-box-paciente {
+    flex: 1;
+    padding: 25px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Separadores de Fecha (Ayer, Hoy) */
+.chat-date-separator {
+    text-align: center;
+    margin: 20px 0;
+    position: relative;
+}
+
+.chat-date-separator::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 1px;
+    background: #e2e8f0;
+    z-index: 1;
+}
+
+.chat-date-separator span {
+    position: relative;
+    z-index: 2;
+    background: #f1f5f9;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* Burbujas de Mensaje */
+.message {
+    max-width: 70%;
+    padding: 10px 14px;
+    border-radius: 18px;
+    font-size: 0.9rem;
+    position: relative;
+    line-height: 1.4;
+}
+
+.message.sent {
+    align-self: flex-end;
+    background: #0d88b0; /* Color de tu paleta FYM */
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.message.received {
+    align-self: flex-start;
+    background: #e4e6eb;
+    color: #050505;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+}
+
+.msg-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 0.7rem;
+    opacity: 0.8;
+}
+
+/* --- ÁREA DE INPUT --- */
+.chat-input-wrapper {
+    padding: 20px;
+    background: #fff;
+    border-top: 1px solid #eef2f6;
+    display: flex;
+    gap: 12px;
+}
+
+.chat-input-wrapper input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 25px;
+    outline: none;
+    transition: border 0.2s;
+}
+
+.chat-input-wrapper input:focus {
+    border-color: #0fa3b1;
+}
+
+.chat-input-wrapper button {
+    background: #0fa3b1;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: opacity 0.2s;
+}
+
+.chat-input-wrapper button:hover {
+    opacity: 0.9;
+}
+
+/* Esto obliga a la barra de entrada a ocupar todo el ancho */
+.chat-input-wrapper {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 10px;
+    gap: 10px;
+}
+
+#input-mensaje-psicologo {
+    flex: 1; /* Esto hace que el input crezca y use el espacio sobrante */
+    padding: 10px 15px;
+    border-radius: 20px;
+    border: 1px solid #ccc;
+    outline: none;
+}
+
+/* Estilo para los separadores de fecha que ahora sí aparecerán */
+.chat-date-separator {
+    text-align: center;
+    margin: 20px 0;
+    clear: both;
+}
+
+.chat-date-separator span {
+    background-color: #e1f5fe;
+    color: #0288d1;
+    padding: 5px 15px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* Estado seleccionado */
+#lista-pacientes-chat li.active {
+    background-color: #e3f2fd; /* Un azul muy claro */
+    border-left: 4px solid #2196f3; /* Una barrita azul a la izquierda tipo WhatsApp */
+}
+
+/* Efecto hover para saber que se puede clickear */
+#lista-pacientes-chat li:hover {
+    background-color: #f5f5f5;
+    cursor: pointer;
+}
+
+/* Para asegurar que el contenido no se mueva con el borde de la clase active */
+#lista-pacientes-chat li {
+    transition: background 0.3s ease;
+    border-left: 4px solid transparent;
 }

@@ -19,7 +19,11 @@ from rest_framework.response import Response
 import json
 from django.http import JsonResponse
 from django.contrib.auth import get_user_model
-
+import locale
+try:
+    locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8') # O 'es_ES' según tu server
+except:
+    pass
 User = get_user_model()
 
 # Create your views here.
@@ -54,7 +58,7 @@ def login(request):
             if tipo == 1:
                 return redirect('paciente')
             elif tipo == 2:
-                return redirect('/panel/')
+                return redirect('/panel_psicologos/')
             elif tipo == 3:
                 return redirect('admin')
             else:
@@ -301,50 +305,7 @@ def dar_de_baja_psicologo(request, id):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=500)
     return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
-        
-@login_required
-def panel(request):
-    # 1. Obtener el perfil del psicólogo logueado
-    try:
-        psicologo = Psicologo.objects.get(usuario=request.user)
-    except Psicologo.DoesNotExist:
-        # Si el usuario no es psicólogo, podrías redirigirlo o mostrar un error
-        messages.error(request, "No tienes perfil de psicólogo asignado.")
-        return redirect('/')
-
-    # 2. Datos para el Panel Principal (Estadísticas)
-    # Obtenemos citas del día de hoy
-    hoy = timezone.now().date()
-    citas_hoy_count = Cita.objects.filter(psicologo=psicologo, fecha=hoy).count()
     
-    # Pacientes únicos que atiende este psicólogo
-    pacientes_activos = Paciente.objects.filter(cita__psicologo=psicologo).distinct().count()
-    
-    # 3. Listado de Citas para la tabla del Panel
-    citas_pendientes = Cita.objects.filter(
-        psicologo=psicologo, 
-        estado__nombre='Pendiente' # Asegúrate que este nombre exista en EdoCita
-    ).order_by('fecha', 'hora')
-
-    # 4. Listado de Citas para la sección de Agendas (todas)
-    todas_las_citas = Cita.objects.filter(psicologo=psicologo).order_by('-fecha')
-
-    # 5. Teléfono del psicólogo para la sección de Cuenta
-    telefono_obj = Telefono.objects.filter(usuario=request.user).first()
-
-    contexto = {
-        'psicologo': psicologo,
-        'citas_hoy': citas_hoy_count,
-        'pacientes_activos': pacientes_activos,
-        'citas': citas_pendientes,
-        'agendas': todas_las_citas,
-        'telefono': telefono_obj.numTel if telefono_obj else "",
-    }
-    return render(request, 'psicologos/psicologo.html', contexto)
-    return render(request, 'psicologos/PANEL.html')
-
-def mensajes(request):
-    return render(request, 'psicologos/psicologo.html')
 
 @login_required
 def obtener_mensajes(request, usuario_id):
@@ -978,6 +939,7 @@ def guardar_consulta(request):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
     return JsonResponse({'status': 'error', 'message': 'Solo POST'}, status=405)
+#PANEL PSICÓLOGOS
 
 @login_required
 def panel_psicologos(request):
@@ -989,28 +951,44 @@ def panel_psicologos(request):
 
     hoy = timezone.now().date()
     
-    # --- DATOS EXISTENTES ---
+    # --- ESTADÍSTICAS ---
     citas_hoy_count = Cita.objects.filter(psicologo=psicologo, fecha=hoy).count()
     pacientes_activos = Paciente.objects.filter(cita__psicologo=psicologo).distinct().count()
     
-    citas_pendientes = Cita.objects.filter(
-        psicologo=psicologo, 
-        estado__nombre='Pendiente' 
-    ).order_by('fecha', 'hora')
+    # --- LÓGICA DE PACIENTES PARA EL CHAT ---
+    # Obtenemos los IDs de los pacientes que tienen citas con este psicólogo
+    pacientes_ids = Cita.objects.filter(psicologo=psicologo).values_list('paciente_id', flat=True).distinct()
+    mis_pacientes = Paciente.objects.filter(numero__in=pacientes_ids).select_related('usuario')
 
+    # IDs de conversaciones donde participa el psicólogo
+    mis_conv_ids = list(ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True))
+
+    for pac in mis_pacientes:
+        # Buscamos la conversación común entre el psicólogo y este paciente
+        relacion = ConvUsuario.objects.filter(
+            conversacion_id__in=mis_conv_ids, 
+            usuario_id=pac.usuario.numero # El usuario vinculado al paciente
+        ).first()
+        
+        if relacion:
+            ultimo_msg = Mensaje.objects.filter(conversacion=relacion.conversacion).order_by('-fechaEnvio').first()
+            if ultimo_msg:
+                pac.ultimo_texto = ultimo_msg.contenido
+                pac.ultima_hora = ultimo_msg.fechaEnvio
+                pac.yo_lo_envie = (ultimo_msg.usuario == request.user)
+                pac.sin_leer = (not ultimo_msg.leido and ultimo_msg.usuario != request.user)
+            else:
+                pac.ultimo_texto = "Sin mensajes"
+        else:
+            pac.ultimo_texto = "Sin chat iniciado"
+
+    # --- HISTORIALES ---
+    citas_pendientes = Cita.objects.filter(psicologo=psicologo, estado__nombre='Pendiente').order_by('fecha', 'hora')
     todas_las_citas = Cita.objects.filter(psicologo=psicologo).order_by('-fecha')
+    consultas_historial = Consulta.objects.filter(cita__psicologo=psicologo).select_related('cita', 'cita__paciente__usuario').order_by('-cita__fecha')
+    pagos_historial = Pago.objects.filter(consulta__cita__psicologo=psicologo).order_by('-fecha', '-hora')
+    
     telefono_obj = Telefono.objects.filter(usuario=request.user).first()
-
-    # --- NUEVOS DATOS PARA HISTORIALES ---
-    # 1. Historial de Consultas (solo las de este psicólogo)
-    consultas_historial = Consulta.objects.filter(
-        cita__psicologo=psicologo
-    ).select_related('cita', 'cita__paciente__usuario').order_by('-cita__fecha')
-
-    # 2. Historial de Pagos (solo los de las consultas de este psicólogo)
-    pagos_historial = Pago.objects.filter(
-        consulta__cita__psicologo=psicologo
-    ).select_related('consulta__cita__paciente__usuario').order_by('-fecha', '-hora')
 
     contexto = {
         'psicologo': psicologo,
@@ -1018,11 +996,59 @@ def panel_psicologos(request):
         'pacientes_activos': pacientes_activos,
         'citas': citas_pendientes,
         'agendas': todas_las_citas,
-        'consultas': consultas_historial, # Clave para el HTML
-        'pagos': pagos_historial,         # Clave para el HTML
+        'consultas': consultas_historial,
+        'pagos': pagos_historial,
+        'mis_pacientes': mis_pacientes,
         'telefono': telefono_obj.numTel if telefono_obj else "",
     }
     return render(request, 'psicologos/psicologo.html', contexto)
+
+# Reutilizamos la misma lógica de mensajes pero para el psicólogo
+@login_required
+def obtener_mensajes_psicologo(request):
+    paciente_user_id = request.GET.get('paciente_id') 
+    if not paciente_user_id:
+        return JsonResponse([], safe=False)
+
+    # 1. Buscamos la conversación que comparten el paciente y el psicólogo
+    # Primero obtenemos todas las conversaciones del paciente actual
+    mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+    
+    # Buscamos si en alguna de esas conversaciones también está el psicólogo
+    relacion_comun = ConvUsuario.objects.filter(
+        conversacion_id__in=mis_convs, 
+        usuario_id=paciente_user_id
+    ).first()
+
+    if not relacion_comun:
+        return JsonResponse([], safe=False)
+
+    # 2. Obtenemos los mensajes usando el campo 'conversacion' y ordenamos por 'fechaEnvio'
+    mensajes_queryset = Mensaje.objects.filter(
+        conversacion=relacion_comun.conversacion
+    ).order_by('fechaEnvio')
+
+    # 3. Marcar mensajes del psicólogo como leídos
+    Mensaje.objects.filter(
+        conversacion=relacion_comun.conversacion,
+        leido=False
+    ).exclude(usuario=request.user).update(leido=True)
+    
+    data = []
+    for m in mensajes_queryset:
+        hora_local = timezone.localtime(m.fechaEnvio)
+        data.append({
+            'texto': m.contenido,
+            'tipo': 'sent' if m.usuario == request.user else 'received',
+            'hora': hora_local.strftime('%I:%M %p'),
+            'fecha_completa': hora_local.strftime('%Y-%m-%d'), # Formato para comparar: 2026-04-15
+            'dia_str': hora_local.strftime('%d de %B, %Y'), # Formato legible
+            'leido': m.leido
+        })
+        
+    return JsonResponse(data, safe=False)
+
+#PANEL PACIENTES
 
 @login_required
 def paciente(request):
@@ -1277,21 +1303,25 @@ def enviar_mensaje_paciente(request):
         if relacion:
             conversacion_obj = relacion.conversacion
         else:
-            # Creamos la conversación nueva si no existía
             conversacion_obj = Conversacion.objects.create(fechaInicio=timezone.now())
             ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=request.user)
             psicologo_user = get_object_or_404(Usuario, numero=receptor_id)
             ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=psicologo_user)
 
-        # 2. Crear el mensaje ligado a esa conversación
-        Mensaje.objects.create(
+        # 2. Crear el mensaje (SOLO UNA VEZ)
+        nuevo_msg = Mensaje.objects.create(
             contenido=contenido,
             fechaEnvio=timezone.now(),
             conversacion=conversacion_obj,
             usuario=request.user
         )
 
-        return JsonResponse({'status': 'ok'})
+        # Devolvemos los datos del UNICO mensaje creado
+        return JsonResponse({
+            'status': 'ok',
+            'contenido': nuevo_msg.contenido,
+            'hora': timezone.localtime(nuevo_msg.fechaEnvio).strftime('%I:%M %p')
+        })
     return JsonResponse({'status': 'error'}, status=400)
 
 def api_psicologos_disponibles(request):

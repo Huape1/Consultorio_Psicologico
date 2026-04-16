@@ -7,14 +7,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Psicólogo - FYM</title>
     <link rel="stylesheet" href="{% static 'css/psicologos.css' %}">
-    <style>
-        .section { display: none; }
-        .section.active { display: block; }
-        .account-form input[readonly] { background-color: #f8fafc; color: #64748b; cursor: not-allowed; }
-        .active-user { background-color: #e2e8f0; border-left: 4px solid #3b82f6; }
-        .message.sent { text-align: right; background: #dcf8c6; margin-left: 20%; border-radius: 10px 10px 0 10px; padding: 8px; margin-bottom: 5px; }
-        .message.received { text-align: left; background: #fff; margin-right: 20%; border-radius: 10px 10px 10px 0; padding: 8px; margin-bottom: 5px; border: 1px solid #ddd; }
-    </style>
 </head>
 
 <body>
@@ -179,77 +171,58 @@
             </section>
 
             <section id="mensajes" class="section">
-                <style>
-                    /* Contenedor de las burbujas */
-                    #contenedor-mensajes {
-                        display: flex;
-                        flex-direction: column; /* Alinea los hijos uno debajo de otro */
-                        gap: 10px;
-                        padding: 20px;
-                        background: #fafafa;
-                        flex: 1;
-                        overflow-y: auto;
-                    }
-
-                    /* Estilo base de todas las burbujas */
-                    .message {
-                        max-width: 70%; /* Evita que se estire a todo lo ancho */
-                        padding: 10px 15px;
-                        border-radius: 15px;
-                        font-size: 14px;
-                        line-height: 1.4;
-                        word-wrap: break-word;
-                        margin-bottom: 5px;
-                    }
-
-                    /* burbuja AZUL para lo que tú envías */
-                    .message.sent {
-                        align-self: flex-end; /* Empuja a la derecha */
-                        background-color: #3b82f6; /* El azul de tu botón Enviar */
-                        color: white;
-                        border-bottom-right-radius: 2px; /* Punta de chat */
-                    }
-
-                    /* burbuja GRIS para lo que recibes */
-                    .message.received {
-                        align-self: flex-start; /* Empuja a la izquierda */
-                        background-color: #e5e7eb;
-                        color: #1f2937;
-                        border-bottom-left-radius: 2px;
-                    }
-
-                    /* Lista lateral de pacientes */
-                    .user-item {
-                        padding: 12px;
-                        border-bottom: 1px solid #eee;
-                        cursor: pointer;
-                        transition: background 0.2s;
-                    }
-                    .user-item:hover {
-                        background: #f1f5f9;
-                    }
-                </style>
-
-                <div class="chat-layout" style="display: flex; height: 80vh; gap: 20px;">
-                    <div class="chat-users" style="flex: 1; border-right: 1px solid #ddd; overflow-y: auto; background: white; border-radius: 8px;">
-                        <h3 style="padding: 15px; border-bottom: 1px solid #eee; margin: 0;">Pacientes</h3>
-                        <ul id="lista-usuarios-chat" style="list-style: none; padding: 0; margin: 0;">
-                            </ul>
-                    </div>
-
-                    <div class="chat-box" style="flex: 3; display: flex; flex-direction: column; background: white; border-radius: 8px; border: 1px solid #eee; overflow: hidden;">
-                        <div class="chat-header" id="chat-header-nombre" style="padding: 15px; background: #f1f5f9; font-weight: bold; border-bottom: 1px solid #ddd;">
-                            Selecciona un chat para comenzar
+                <div class="card-chat-container">
+                    <div class="chat-sidebar">
+                        <div class="chat-sidebar-header">
+                            <h3>Mis Pacientes</h3>
+                            <div class="search-box">
+                                <input type="text" id="buscarPaciente" placeholder="Buscar paciente..." onkeyup="filtrarPacientes()">
+                            </div>
                         </div>
                         
-                        <div id="contenedor-mensajes">
-                            </div>
+                        <ul id="lista-pacientes-chat">
+                            {% for pac in mis_pacientes %}
+                            <li class="chat-item {% if pac.sin_leer %}unread{% endif %}" 
+                                onclick="seleccionarChatPaciente('{{ pac.usuario.numero }}', '{{ pac.usuario.nombrePila }} {{ pac.usuario.primerApellido }}', event)">
+                                
+                                <div class="chat-avatar">
+                                    <img src="{% if pac.usuario.fotoPerfil %}{{ pac.usuario.fotoPerfil.url }}{% else %}/static/img/default.png{% endif %}">
+                                </div>
+                                
+                                <div class="chat-info">
+                                    <div class="chat-info-top">
+                                        <span class="chat-name">{{ pac.usuario.nombrePila }} {{ pac.usuario.primerApellido }}</span>
+                                        <span class="chat-time">{{ pac.ultima_hora|time:"g:i A" }}</span>
+                                    </div>
+                                    <div class="chat-last-msg">
+                                        {% if pac.yo_lo_envie %}<span class="tu-prefix">Tú: </span>{% endif %}
+                                        <span class="msg-content">{{ pac.ultimo_texto|truncatechars:25 }}</span>
+                                    </div>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
 
-                        <div class="chat-input" style="padding: 15px; display: flex; gap: 10px; background: white; border-top: 1px solid #eee;">
-                            {% csrf_token %}
-                            <input type="text" id="input-mensaje" placeholder="Escribe un mensaje..." style="flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
-                            <button onclick="enviarMensaje()" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Enviar</button>
+                    <div class="chat-main">
+                        <div id="chat-header-psico">
+                            <span id="chat-header-name">Selecciona un paciente para conversar</span>
                         </div>
+                        
+                        <div id="chat-box-psicologo">
+                            <div class="chat-welcome">
+                                <p>Historial clínico y mensajes privados.</p>
+                            </div>
+                        </div>
+
+                        <form id="form-chat-psicologo" style="display: none;">
+                            {% csrf_token %}
+                            <input type="hidden" id="receptor_paciente_id">
+                            <div class="chat-input-wrapper">
+                                <input type="text" id="input-mensaje-psicologo" placeholder="Escribe un mensaje..." required>
+                                <button type="submit"><span>Enviar</span></button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </section>

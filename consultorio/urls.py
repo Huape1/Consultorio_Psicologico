@@ -20,8 +20,7 @@ urlpatterns = [
     path('dar_de_baja_psicologo/<int:id>/', views.dar_de_baja_psicologo, name='dar_de_baja_psicologo'),
     path('esp/', views.esp),
     # --- PANEL PSICÓLOGO ---
-    path('panel/', views.panel, name='panel_psicologo'),
-    path('mensajes/', views.mensajes, name='mensajes'),
+    path('obtener-mensajes-psicologo/', views.obtener_mensajes_psicologo, name='obtener_mensajes_psicologo'),
     path('api/chat/usuarios/', views.api_lista_usuarios_chat, name='api_usuarios_chat'),
     path('api/chat/enviar/', views.enviar_mensaje_chat, name='enviar_mensaje'),
     path('api/chat/mensajes/<int:usuario_id>/', views.obtener_mensajes, name='obtener_mensajes'),
