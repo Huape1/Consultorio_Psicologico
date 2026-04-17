@@ -3,6 +3,11 @@ from django.contrib.auth import authenticate
 from ..models import Usuario, TipoUsuario, Paciente, Telefono, EdoCuenta
 from django.contrib.auth.hashers import make_password
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import authenticate
 import json
 from django.http import JsonResponse
 from django.contrib.auth import get_user_model
@@ -13,45 +18,26 @@ except:
     pass
 User = get_user_model()
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
 def api_login(request):
-    if request.method == 'POST':
-        # Flutter envía JSON, así que lo leemos así:
-        try:
-            data = json.loads(request.body)
-            correo_login = data.get('correo')
-            password_login = data.get('password')
-        except:
-            # Si mandas los datos como Form Data en lugar de JSON
-            correo_login = request.POST.get('correo')
-            password_login = request.POST.get('password')
-
-        user = authenticate(request, username=correo_login, password=password_login)
-
-        if user is not None:
-            estado = getattr(user.estadoCuenta, 'nombre', user.estadoCuenta)
-            
-            if str(estado).lower() != 'activo':
-                return JsonResponse({'error': 'Cuenta inactiva'}, status=403)
-
-            # En lugar de auth_login (que es para sesiones de navegador), 
-            # simplemente devolvemos los datos del usuario.
-            return JsonResponse({
-                'token': 'session_token_temporal', # Aquí luego pondremos un JWT real
-                'user': {
-                    'numero': user.numero,
-                    'nombrePila': user.nombrePila,
-                    'primerApellido': user.primerApellido,
-                    'segundoApellido': user.segundoApellido,
-                    'correo': user.correo,
-                    'tipoUsuario': user.tipoUsuario_id,
-                    'genero': user.genero,
-                }
-            }, status=200)
-        else:
-            return JsonResponse({'error': 'Credenciales inválidas'}, status=401)
-            
-    return JsonResponse({'error': 'Método no permitido'}, status=405)
+    correo = request.data.get('correo')
+    password = request.data.get('password')
+    user = authenticate(username=correo, password=password)
+    
+    if user is not None:
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({
+            'token': token.key, # <--- ¡VITAL!
+            'user': { # <--- Envolvemos en 'user' para que Flutter lo encuentre
+                'numero': user.pk,
+                'nombrePila': user.nombrePila,
+                'correo': user.correo,
+                'tipoUsuario': user.tipoUsuario.pk if user.tipoUsuario else 1,
+            }
+        }, status=200)
+    else:
+        return Response({'error': 'Credenciales inválidas'}, status=401)
 
 @csrf_exempt
 def api_registro_paciente(request):

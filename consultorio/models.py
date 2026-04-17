@@ -18,7 +18,7 @@ class TipoUsuario(models.Model):
 
 class EdoCuenta(models.Model):
     clave = models.AutoField(primary_key=True)
-    nombre = models.CharField(max_length=50) # Ej. Activo, Inactivo, Bloqueado
+    nombre = models.CharField(max_length=50) # Ej. Activo, Inactivo
     descripcion = models.TextField(blank=True, null=True)
 
     def __str__(self):

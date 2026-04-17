@@ -28,7 +28,7 @@ SECRET_KEY = 'django-insecure-i4ktffqx5f*$!l!-38g&7os2$!hwtvpfnsaqzfe#a)hqwv)+by
 DEBUG = True
 
 # Permite que el emulador y tu PC local entren
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '10.0.2.2']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.100.9']
 
 # Application definition
 
@@ -41,8 +41,19 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'consultorio',
     'rest_framework',
+    'rest_framework.authtoken',
     'corsheaders'
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication', # Habilita Tokens
+        'rest_framework.authentication.SessionAuthentication', # Mantiene el Admin de Django funcional
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated', # Cierra todo por defecto (Seguridad)
+    ],
+}
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',

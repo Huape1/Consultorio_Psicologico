@@ -1,8 +1,9 @@
 from django.urls import path
 from .views import index_web, pacientes_web, psicologo_web, admin_web, auth_movil, pacientes_movil, psicologos_movil, admin_movil
-from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .api import UsuarioViewSet
+from django.conf import settings
+from django.conf.urls.static import static
 
 router = DefaultRouter()
 router.register(r'usuarios', UsuarioViewSet, basename='usuario')
@@ -43,6 +44,33 @@ urlpatterns = [
     path('panel_psicologos/', psicologo_web.panel_psicologos, name='panel_psicologos'), #Puede que lo elimine
     path('agendas/', psicologo_web.agendas, name='agendas'), #Puede que la elimine
     # |||| --- F L U T E R --- |||
+    # Auth
     path('api/login/', auth_movil.api_login), 
-    path('api/registro-api/', auth_movil.api_registro_paciente), 
-]
+    path('api/registro-api/', auth_movil.api_registro_paciente),
+    #Admin
+    path('admin/stats/', admin_movil.api_admin_stats),
+    path('api/admin/psychologists/', admin_movil.api_get_psychologists),
+    path('api/admin/psychologists/create/', admin_movil.api_create_psychologist),
+    path('admin/specialties/', admin_movil.api_get_specialties, name='api_get_specialties'),
+    path('api/admin/psychologists/update/<int:pk>/', admin_movil.api_update_psychologist),
+    path('api/admin/schedules/', admin_movil.api_get_schedules, name='api_get_schedules'),
+    path('api/admin/schedules/manage/<int:pk>/', admin_movil.api_manage_schedule, name='api_manage_schedule'),
+    path('api/admin/list-admins/', admin_movil.api_get_admins, name='api_get_admins'),
+    path('api/admin/manage-admin/<int:pk>/', admin_movil.api_manage_admin, name='api_manage_admin'),
+    path('api/auth/profile/', admin_movil.get_user_profile, name='get_profile'),
+    path('api/auth/profile/update/', admin_movil.update_user_profile, name='update_profile'),
+    #Pacientes
+    path('api/paciente/dashboard/', pacientes_movil.get_paciente_dashboard, name='get_paciente_dashboard'),
+    path('paciente/perfil/', pacientes_movil.get_paciente_data, name='paciente_perfil'),
+    path('paciente/citas/', pacientes_movil.get_mis_citas),
+    path('paciente/setup-agendar/', pacientes_movil.get_setup_agendar),
+    path('paciente/agendar/', pacientes_movil.agendar_cita_api, name='agendar_cita'),
+    path('api/paciente/perfils/', pacientes_movil.get_perfil_paciente),
+    path('api/paciente/actualizar-perfil-api/', pacientes_movil.actualizar_perfil_api),
+    #Psicologos
+    path('api/psicologo/dashboard/', psicologos_movil.psicologo_dashboard, name='psicologo_dashboard'),
+    path('api/psicologo/pacientes/', psicologos_movil.get_mis_pacientes), 
+    path('api/psicologo/agenda/', psicologos_movil.get_agenda_diaria, name='get_agenda_diaria'),
+    path('api/psicologo/perfil/', psicologos_movil.get_perfil_psicologo), 
+    path('api/psicologo/actualizar-perfil/', psicologos_movil.actualizar_perfil_psicologo), 
+]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
