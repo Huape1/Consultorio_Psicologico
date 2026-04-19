@@ -5,13 +5,309 @@
     font-family: 'Segoe UI', sans-serif;
 }
 
+:root {
+    --primary: #0fa3b1;
+    --sidebar-bg: #1a222e;
+    --bg-light: #f2f0eb;
+    --text-light: #0fa3b1;
+}
+
+.layout {
+    display: flex;
+    height: 100vh;
+}
+
+/* Consultas */
+/* --- Contenedor Principal de Consultas --- */
+.consultas-container {
+    padding: 30px;
+    background-color: var(--fym-bg);
+    font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+.subsection-title {
+    font-size: 0.93rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 10px 0 10px 0;
+}
+
+/* 1. Mini Cards Superiores */
+.next-appointments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.mini-appointment-card {
+    border: 1px solid var(--primary) ;
+    background: white;
+    padding: 15px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    box-shadow: var(--card-shadow);
+}
+
+.mini-appointment-card:hover {
+    transform: translateY(-5px);
+}
+
+.mini-avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    margin-right: 12px;
+    object-fit: cover;
+}
+
+.mini-info h4 { margin: 0; font-size: 0.76rem; }
+.mini-info p { margin: 2px 0; font-size: 0.73rem; color: var(--fym-primary); font-weight: 600; }
+.mini-meta { font-size: 0.68rem; color: var(--text-light) !important; }
+
+/* --- 2. Cita en Curso (Centro - El diseño grande) --- */
+.main-appointment-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    margin-top: 10px;
+}
+
+.large-avatar {
+    width: 90px; /* Más pequeño */
+    height: 90px;
+    border-radius: 50%; /* Foto en forma de círculo */
+    border: 3px solid #E6FFFA;
+    object-fit: cover;
+    border: 1.5px solid var(--primary) ;
+    padding: 2px;
+}
+
+.main-card-body {
+    display: flex;
+    padding: 28px 20px 20px 20px;
+    gap: 30px;
+    border-radius: 18px;
+    border-left: 5px solid var(--primary);
+    outline: 1.5px solid var(--primary);
+    border-radius: 18px;
+    margin-bottom: 30px;
+    transform: translateZ(0);
+}
+
+.patient-profile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+
+.status-badge {
+    background: #8bc5d5;
+    color: black;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+}
+
+.appointment-details {
+    flex: 1;
+}
+
+.details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.details-header h2 {
+    font-size: 1.3rem;
+    color: var(--fym-dark);
+    margin: 0;
+}
+
+.therapy-type {
+    background: #E6FFFA;
+    color: #2C7A7B;
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 0.76rem;
+    margin-top: 5px;
+}
+.time-stamp {
+    text-align: right;
+}
+
+.time-stamp .time {
+    display: block;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.reason-box {
+    background: var(--bg-light);
+    padding: 10px 10px;
+    border-radius: 12px;
+    margin: 20px 0;
+    border: 0.7px solid var(--primary);
+}
+
+.reason-box label {
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    color: #A0AEC0;
+    font-weight: 800;
+}
+
+.reason-box p {
+    color: #4A5568;
+    line-height: 1.5;
+    margin-top: 5px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 10px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(15, 163, 177, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    border: 1px solid var(--primary);
+    color: var(--text-dark);
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(15, 163, 177, 0.3);
+}
+
+.chart-placeholder {
+    height: 200px;
+    display: flex;
+    align-items: flex-end;
+    padding-top: 20px;
+}
+
+.bar-container {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    align-items: flex-end;
+    height: 100%;
+}
+
+.bar {
+    width: 35px;
+    background: #059669;
+    border-radius: 8px 8px 0 0;
+    position: relative;
+    transition: background 0.3s;
+}
+
+.bar:hover { background: var(--fym-primary); }
+
+.bar span {
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: var(--text-light);
+}
+
+/* --- 3. Grid Inferior (Gráfica y Stats) --- */
+.bottom-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 25px;
+}
+
+.chart-card {
+    background: white;
+    padding: 25px 20px 0px 20px;;
+    border-radius: 20px;
+    border: 1px solid var(--primary);
+    box-shadow: var(--shadow);
+}
+
+.btn-filter {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: 0.3s;
+    color: #64748b;
+}
+
+.btn-filter.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.chart-card {
+    padding: 20px !important; /* Ajuste para que el gráfico respire */
+}
+
+.info-card {
+    background: white;
+    padding: 35px 25px 35px 25px;
+    border-radius: 20px;
+    display: flex;
+    gap: 15px;
+    box-shadow: var(--shadow);
+    margin-bottom: 25px;
+    border: 1px solid var(--primary);
+}
+
+.info-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.info-icon.blue { background: #e0f2fe; color: #0369a1; }
+.info-icon.clock { background: #f0fdf4; color: #166534; }
+
+/* fin consultas */
+
 body {
     background: #f1f5f9;
 }
 
 body, html {
-    height: auto;
-    overflow-y: auto;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
 }
 
 /* Contenedor principal */
@@ -22,13 +318,17 @@ body, html {
 
 /* Sidebar Estilizada */
 .sidebar {
-    width: 240px; /* Bajamos de 280px */
-    background-color: #1a222e;
-    min-height: 100vh;
-    padding: 30px 15px; /* Menos padding interno */
-    color: #ffffff;
-    font-family: 'Inter', sans-serif; /* Una fuente más limpia ayuda */
+    width: 220px; /* Tamaño reducido */
+    background-color: var(--sidebar-bg);
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    padding: 20px 10px;
+    z-index: 1000;
 }
+
+
 #contenedor-mensajes {
     display: flex;
     flex-direction: column;
@@ -59,12 +359,16 @@ body, html {
 /* Main */
 .main {
     flex: 1;
-    padding: 40px;
-    overflow-y: auto;
+    margin-left: 220px; /* Deja espacio para la sidebar fija */
+    height: 100vh;
+    overflow-y: auto; /* El scroll solo sucede aquí */
+    padding: 25px;
+    background-color: var(--bg-light);
 }
 
 /* Secciones dinámicas */
 .section {
+    display: none !important;
     min-height: 100vh;
     padding-bottom: 50px; /* Espacio extra al final */
     overflow-y: visible;
@@ -72,8 +376,13 @@ body, html {
 
 /* 2. Muestra solo la sección que tiene la clase 'active' */
 .section.active {
-    display: block;
+    display: block !important;
 }
+
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.2rem; }
+h3 { font-size: 1rem; }
+p, span, td, th { font-size: 0.76rem; }
 
 /* Topbar */
 .topbar {
@@ -328,7 +637,7 @@ h1, h2, h3 {
 }
 
 section {
-    margin-bottom: 20px;
+    margin-bottom: 0px;
 }
 
 .menu {
@@ -349,6 +658,11 @@ section {
     font-size: 18px; /* Icono más pequeño */
     display: flex;
     align-items: center;
+}
+
+.icon-svg {
+    vertical-align: middle;
+    margin-right: 5px;
 }
 
 /* Estado Activo */
@@ -407,19 +721,6 @@ section {
     margin: 4px 0;
 }
 
-.btn-atender {
-    background-color: #10b981; /* Verde esmeralda */
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-}
-.btn-atender:hover {
-    background-color: #059669;
-}
-
 .modal {
     overflow-y: auto; /* Permite scroll dentro del fondo oscuro si el modal es muy alto */
 }
@@ -438,29 +739,29 @@ section {
     height: 80vh; /* Ajusta según el espacio disponible */
     background: #fff;
     border-radius: 12px;
+    border: 1px solid var(--primary);
     overflow: hidden;
     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-    border: 1px solid #eef2f6;
 }
 
 /* --- BARRA LATERAL (Sidebar) --- */
 .chat-sidebar {
     width: 320px;
-    border-right: 1px solid #eef2f6;
+    border-right: 1px solid var(--primary);
     display: flex;
     flex-direction: column;
     background: #fff;
 }
 
 .chat-sidebar-header {
-    padding: 20px;
-    border-bottom: 1px solid #eef2f6;
+    padding: 17.5px;
+    background: var(--primary);
 }
 
 .chat-sidebar-header h3 {
-    margin: 0 0 15px 0;
     font-size: 1.2rem;
-    color: #264653;
+    margin: 0;
+    color: var(--bg-light);
 }
 
 /* Caja de búsqueda */
@@ -469,9 +770,13 @@ section {
     display: flex;
     align-items: center;
     background: #f8fafc;
-    padding: 8px 12px;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
+    padding: 12px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    background: var(--bg-light);
+}
+
+.search-box-t{
+    border-bottom: 1px solid var(--primary);
 }
 
 .search-box input {
@@ -540,6 +845,7 @@ section {
 .chat-name {
     font-size: 0.95rem;
     color: #334155;
+    font-weight: 550;
 }
 
 .chat-time {
@@ -565,17 +871,22 @@ section {
 
 #chat-header-psico, #chat-header {
     padding: 18px 25px;
-    background: #fff;
-    border-bottom: 1px solid #eef2f6;
-    font-weight: 600;
-    color: #1e293b;
+    font-weight: 800;
+    color: var(--bg-light);
+    background: var(--primary);
+    border-bottom:1px solid var(--primary);
     font-size: 1.1rem;
+}
+
+#chat-header-name{
+    font-size: 15px !important;
 }
 
 /* Contenedor de burbujas */
 #chat-box-psicologo, #chat-box-paciente {
     flex: 1;
-    padding: 25px;
+    background: #E8FBFD;
+    padding: 15px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -630,7 +941,7 @@ section {
 
 .message.received {
     align-self: flex-start;
-    background: #e4e6eb;
+    background: #e2e2e2;
     color: #050505;
     border-bottom-left-radius: 4px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.03);
@@ -690,6 +1001,7 @@ section {
     width: 100%;
     padding: 10px;
     gap: 10px;
+    border-top: 1px solid var(--primary);
 }
 
 #input-mensaje-psicologo {
@@ -732,4 +1044,516 @@ section {
 #lista-pacientes-chat li {
     transition: background 0.3s ease;
     border-left: 4px solid transparent;
+}
+
+
+/* 
+    AGENDA
+*/
+
+/* Contenedor principal */
+.table-container {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+/* Tabla */
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.custom-table th {
+    text-align: left;
+    color: #64748b;
+    font-weight: 500;
+    padding: 15px;
+}
+
+.actions-cell{
+    padding-right: 0 !important;
+}
+
+.custom-table td {
+    padding: 15px;
+    border-top: 1px solid var(--primary);
+    color: #1e293b;
+    vertical-align: middle;
+    margin-bottom: 2px;
+}
+
+/* Celda del Paciente */
+.patient-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.table-avatar {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.p-name { font-weight: 600; margin: 0; }
+.p-service { font-size: 0.85rem; color: #64748b; margin: 0; }
+
+.status-badge.pendiente { background: #dbeafe; color: #1e40af; } /* Azul */
+.status-badge.confirmada { background: #e0f2fe; color: #0369a1; } /* Cyan */
+.status-badge.completada { background: #dcfce7; color: #166534; } /* Verde */
+
+/* Botones de Acción */
+.btn-table {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: 0.3s;
+}
+
+.filter-pills{
+    margin-top: 15px;
+}
+
+.btn-pill{
+    background: #dbeafe;
+    border-radius: 15px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 8px 16px;
+}
+
+.btn-pill.active{
+    background: #00a0b1;
+    border-radius: 15px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 8px 16px;
+}
+
+.btn-pill:hover {
+    background-color: #00a0b1;
+}
+
+.btn-atender { background: #00a0b1; color: white; }
+.btn-atender:hover {
+    background-color: #006d7a;
+}
+.btn-view { background: #f1f5f9; color: #475569; margin-left: 5px; border: 0.5px solid #6f6f6f;}
+.btn-view:hover{
+    background-color: #006d7a;;
+    color: white;
+}
+.btn-resumen { background: #0d9488; color: white; }
+
+/* Controles superiores */
+.agenda-controls {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 25px;
+    margin-top: 15px;
+    background: white;
+    align-items: center;
+    border-radius: 20px;
+    padding: 18px;
+}
+
+.input-group {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px;
+    display: inline-flex;
+    align-items: center;
+    margin-right: 15px;
+    background: var(--bg-light);
+}
+
+.input-group input {
+    border: none;
+    background: transparent;
+    outline: none;
+    margin-left: 10px;
+    width: 200px;
+}
+
+/* Caja de resumen azul */
+.summary-box {
+    background: #cceeff;
+    padding: 25px 25px;
+    border-radius: 15px;
+    text-align: left;
+}
+.summary-box p { margin: 0; color: #0c4a6e; font-size: 0.9rem; font-weight: 500; margin-bottom: 5px; }
+.summary-box h2 { margin: 0; color: #0c4a6e; font-weight: 750; }
+
+/*
+    SESIONES
+*/
+
+#session-title{
+    padding-left: 30px;
+    margin-top: 15px;
+    margin-bottom: 4px !important;
+}
+
+#step-indicator{
+    padding-bottom: 15px;
+    border-bottom:1px solid var(--primary) ;
+    padding-left: 30px;
+}
+
+.step-subtitle{
+    margin-bottom: 4px;
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 18px;
+    padding-left: 30px;
+}
+
+.step-description{
+    margin-bottom: 15px;
+    padding-left: 30px;
+}
+
+.rating-group label{
+    font-weight: 500;
+    padding-bottom: 5px;
+}
+
+.rating-container{
+    padding-left: 30px;
+    padding-right: 30px;
+}
+
+.step-footer{
+    background: var(--bg-light);
+    border-top: 1px solid var(--primary);
+    padding-bottom: 15px;
+    padding-top: 15px;
+    padding-right: 10px;
+    text-align: right;
+}
+
+.session-container {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 20px;
+    padding: 10px;
+}
+
+.session-main-card {
+    background: white;
+    border-radius: 15px;
+    border: 1px solid var(--primary);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+/* Progress Bar */
+.progress-bar-container {
+    display: flex;
+    gap: 10px;
+    margin: 20px 30px;
+}
+.progress-step {
+    height: 6px;
+    flex: 1;
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+.progress-step.active {
+    background: #00a0b1;
+}
+
+/* Rating Scale (Botonera 1-10) */
+.rating-scale {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    margin-bottom: 20px;
+}
+.btn-rate {
+    width: 35px;
+    height: 35px;
+    border: 1px solid #cbd5e1;
+    background: white;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.btn-rate:hover, .btn-rate.selected {
+    background: #00a0b1;
+    color: white;
+    border-color: #00a0b1;
+}
+
+/* Sidebar */
+.patient-sidebar .sidebar-card {
+    background: white;
+    border-radius: 15px;
+    border: 1px solid var(--primary);
+    position: sticky;
+    top: 20px;
+}
+
+.sidebar-profile{
+    padding: 0px 20px;
+}
+
+#side-ocupacion{
+    display: flex;
+    justify-content: center;
+    font-size: 1rem !important;
+    font-weight: 200;
+    margin-bottom: 3px;
+    margin-top: 3px;
+}
+
+#side-name{
+    display: flex;
+    justify-content: center;
+}
+
+#side-meta{
+    display: flex;
+    justify-content: center;
+    margin-bottom: 15px;
+}
+
+.sidebar-card h3{
+    padding: 20px;
+    margin: 0px !important;
+    border-bottom: 1px solid var(--primary);
+}
+
+.side-avatar {
+    margin-left: 36%;
+    margin-right: 64%;
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    margin-top: 15px;
+    margin-bottom: 7px;
+    border: 5px solid var(--primary);
+}
+
+.sidebar-info-section h5{
+    margin: 0px 20px;
+    margin-bottom: 8px;
+}
+
+.tag.red {
+    background: #fee2e2;
+    color: #ef4444;
+    padding: 4px 8px;
+    margin-left: 20px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+.sidebar-tabs{
+    margin: 10px 20px;
+}
+
+.tab-btn{
+    background: white;
+    padding: 10px 18px;
+    border-radius: 10px;
+    border: 1px solid var(--primary);
+    font-weight: 500;
+    margin-right: 5px;
+    cursor: pointer;
+}
+
+.tab-btn:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(15, 163, 177, 0.3);
+    background: var(--primary);
+    color: white;
+}
+
+#tab-antecedentes{
+    margin: 0px 20px;
+    background: var(--bg-light);
+    border-radius: 15px;
+}
+
+.info-item label{
+    font-size: 14px;
+    font-weight: 750;
+    padding: 8px 6px;
+}
+
+#side-ant-personales{
+    font-size: 12px;
+    font-weight: 450;
+    padding-left: 6px;
+}
+
+#side-ant-familiares{
+    font-size: 12px;
+    font-weight: 450;
+    padding-left: 6px;
+}
+
+#side-ant-psicologicos{
+    font-size: 12px;
+    font-weight: 450;
+    padding-left: 6px;
+}
+
+#side-ant-traumas{
+    font-size: 12px;
+    font-weight: 450;
+    padding-left: 6px;
+}
+
+.btn-edit-exp{
+    margin-left: 22.5%;
+    margin-right: 22.5%;
+    background: var(--primary);
+    color: white;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    padding: 10px 10px;
+    border-radius: 10px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-edit-exp:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(15, 163, 177, 0.3);
+}
+/*
+ Model expediente
+ */
+
+ /* El contenedor que cubre toda la pantalla */
+.modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Dos columnas */
+    gap: 20px;
+}
+
+.modal-overlay {
+    position: fixed; /* Importante: para que flote */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5); /* Fondo oscuro semi-transparente */
+    display: none; /* Se cambia a flex desde JS */
+    justify-content: center;
+    align-items: center;
+    z-index: 9999; /* Asegura que esté por encima de la sidebar y todo lo demás */
+}
+
+/* La tarjeta blanca central */
+.modal-content {
+    background-color: white;
+    padding: 0; /* Quitamos padding para que el header/footer lleguen al borde */
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 85vh;
+    overflow-y: auto; /* Por si el contenido es muy largo */
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Encabezado del modal */
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Cuerpo del modal */
+.modal-body {
+    padding: 20px;
+}
+
+/* Pie del modal */
+.modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Botón cerrar (X) */
+.close-modal {
+    cursor: pointer;
+    font-size: 24px;
+    color: #666;
+}
+
+.form-section h4 {
+    margin-bottom: 10px;
+    color: #2c3e50;
+    border-left: 4px solid #3498db;
+    padding-left: 10px;
+    font-size: 0.95rem;
+}
+
+.full-width {
+    grid-column: span 2;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.input-group textarea, 
+.input-group input, 
+.input-group select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-family: inherit;
+}
+
+.patient-highlight {
+    background: #f0f9ff;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    color: #0369a1;
+}
+
+/*
+    PACIENTES
+*/
+
+#expediente-detalle {
+    background: #fdfdfd;
+    padding: 20px;
+    border: 1px solid #ddd;
+    min-height: 100vh;
+}
+
+.patient-header-card {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    border-bottom: 2px solid #00bcd4;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
 }

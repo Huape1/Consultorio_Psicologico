@@ -14,51 +14,52 @@
     <div class="layout">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h2 class="logo">FYM</h2>
+                <div class="brand-container">
+                    <h2 class="logo">FYM</h2>
+                </div>
             </div>
             <nav class="sidebar-nav">
                 <ul>
                     <li>
                         <a href="#" class="menu active" onclick="showSection('panel', this)">
-                            <span class="icon">⊞</span> Panel principal
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                             Inicio
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="menu" onclick="showSection('seccion-consultas', this)">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+                             Consultas
                         </a>
                     </li>
                     <li>
                         <a href="#" class="menu" onclick="showSection('agendas', this)">
-                            <span class="icon">📅</span> Agendas
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                             Agendas
                         </a>
                     </li>
                     <li>
                         <a href="#" class="menu" onclick="showSection('mensajes', this)">
-                            <span class="icon">💬</span> Mensajes
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" class="menu" onclick="showSection('pacientes', this)">
-                            <span class="icon">👥</span> Pacientes
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" class="menu" onclick="showSection('consultas', this)">
-                            <span class="icon">📋</span> Historial Consultas
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                             Mensajes
                         </a>
                     </li>
                     <li>
                         <a href="#" class="menu" onclick="showSection('pagos', this)">
-                            <span class="icon">💵</span> Facturas y Pagos
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                             Pagos
                         </a>
                     </li>
                     <li>
-                        <a href="#" class="menu" onclick="showSection('cuenta', this)">
-                            <span class="icon">👤</span> Cuenta
+                        <a href="#" class="menu" onclick="showSection('pacientes', this)">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                             Pacientes
                         </a>
                     </li>
                 </ul>
             </nav>
             <div class="sidebar-footer">
-                <a href="{% url 'logout' %}" class="menu logout-btn">
-                    <span class="icon">🚪</span> Cerrar sesión
-                </a>
+                <a href="{% url 'logout' %}" class="menu logout-btn"><span class="icon">🚪</span> Cerrar sesión</a>
             </div>
         </aside>
 
@@ -111,75 +112,511 @@
                     </table>
                 </div>
             </section>
+            <div id="modal-expediente" class="modal-overlay" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-clipboard-list"></i> Crear Expediente Clínico</h3>
+                        <span class="close-modal" onclick="cerrarModalExpediente()">&times;</span>
+                    </div>
+                    
+                    <form id="form-nuevo-expediente">
+                       {% csrf_token %} <div class="modal-body">
+                            <p class="patient-highlight">Paciente: <strong class="paciente-nombre-modal"></strong></p>
+                            
+                            <div class="modal-grid">
+                                <div class="form-section">
+                                    <h4>Información General</h4>
+                                    <div class="input-group">
+                                        <label>Ocupación</label>
+                                        <input type="text" name="ocupacion" placeholder="Ej: Estudiante, Ingeniero">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Estado Civil</label>
+                                        <select name="estado_civil">
+                                            <option value="Soltero/a">Soltero/a</option>
+                                            <option value="Casado/a">Casado/a</option>
+                                            <option value="Divorciado/a">Divorciado/a</option>
+                                            <option value="Viudo/a">Viudo/a</option>
+                                        </select>
+                                    </div>
+                                </div>
 
+                                <div class="form-section">
+                                    <h4>Antecedentes</h4>
+                                    <div class="input-group">
+                                        <label>Personales</label>
+                                        <textarea name="ant_personales" rows="2" placeholder="Médicos, cirugías..."></textarea>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Familiares</label>
+                                        <textarea name="ant_familiares" rows="2"></textarea>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Psicológicos</label>
+                                        <textarea name="ant_psicologicos" rows="2" placeholder="Terapia previa, diagnósticos..."></textarea>
+                                    </div>
+                                </div>
+
+                                <div class="form-section full-width">
+                                    <h4>Evaluación Inicial</h4>
+                                    <div class="input-group">
+                                        <label>Traumas</label>
+                                        <textarea name="traumas" rows="3" required></textarea>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Factores de Riesgo (Opcional)</label>
+                                        <textarea name="riesgos" rows="2"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="modal-footer">
+                            <button type="button" class="btn-secondary" onclick="cerrarModalExpediente()">Cancelar</button>
+                            <button type="submit" class="btn-primary">Guardar Expediente e Iniciar Sesión</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <section id="seccion-consultas" class="section active">
+                <h3 class="subsection-title">Siguientes Citas</h3>
+    
+                    <div class="next-appointments-grid">
+                        {% for cita in citasss %} 
+                        <div class="mini-appointment-card">
+                            <img src="{{ cita.paciente.usuario.fotoPerfil.url }}" class="mini-avatar">
+                            <div class="mini-info">
+                                <h4>{{ cita.paciente.usuario.nombrePila }} {{ cita.paciente.usuario.primerApellido }}</h4>
+                                <p>{{ cita.servicio.nombre }}</p>
+                                <div class="mini-meta">
+                                    <span>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> 
+                                        {% if cita.fecha == hoy %}Hoy{% else %}{{ cita.fecha|date:"d/m" }}{% endif %}</span>
+                                    <span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> 
+                                        {{ cita.hora|time:"h:i A" }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p style="padding-left: 15px; color: #64748b;">No hay más citas para hoy.</p>
+                        {% endfor %}
+                    </div>
+
+                    <h3 class="subsection-title">Cita en Curso / Próxima a Atender</h3>
+                    
+                    <div class="main-appointment-card">
+                        <div class="main-card-body">
+                            <div class="patient-profile">
+                                {% if proxima %}
+                                    <img src="{{ proxima.paciente.usuario.fotoPerfil.url }}" class="large-avatar">
+                                    {% if faltan_15 %}
+                                        <span class="status-badge" style="background: #fee2e2; color: #ef4444;">En 15 min</span>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                            
+                            <div class="appointment-details {% if faltan_15 %}urgent-appointment{% endif %}">
+                                {% if proxima %}
+                                    <div class="details-header">
+                                        <div>
+                                            <h2>{{ proxima.paciente.usuario.nombrePila }} {{ proxima.paciente.usuario.primerApellido }}</h2>
+                                            <p class="therapy-type">
+                                                {{ proxima.servicio.nombre }} - {{ proxima.modalidad.nombre }}
+                                                {% if faltan_15 %}
+                                                    <span class="badge-urgent" style="color: #e63946; font-weight: bold; margin-left: 10px;">
+                                                        ⏱️ Inminente
+                                                    </span>
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                        <div class="time-stamp">
+                                            <span class="time">{{ proxima.hora|time:"h:i A" }}</span>
+                                            <span class="date">
+                                                {% if es_hoy %}Hoy, {{ proxima.fecha|date:"d \d\e F" }}{% else %}{{ proxima.fecha|date:"D d \d\e F" }}{% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="reason-box">
+                                        <label>MOTIVO DE CONSULTA</label>
+                                        <p>{{ proxima.motivo }}</p>
+                                    </div>
+
+                                    <div class="action-buttons">
+                                        <button class="btn-primary" 
+                                                data-nombre="{{ proxima.paciente.usuario.nombrePila }}"
+                                                data-foto="{{ proxima.paciente.usuario.fotoPerfil.url }}"
+                                                data-id="{{ proxima.paciente.numero }}" 
+                                                data-cita-id="{{ proxima.numero }}" data-primera="{% if tiene_expediente %}0{% else %}1{% endif %}"
+                                                onclick="prepararConsulta(this)">
+                                            Realizar consulta
+                                        </button>
+                                        <button class="btn-secondary">
+                                            <span class="icon">📄</span> Ver detalles
+                                        </button>
+                                    </div>
+                                {% else %}
+                                    <div class="no-appointments" style="padding: 20px; text-align: center;">
+                                        <p>No tienes citas próximas programadas para hoy o el futuro.</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bottom-grid">
+                        <div class="chart-card">
+                            <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h3>Consultas Realizadas</h3>
+                                <div class="chart-filters">
+                                    {{ chart_labels_semana|json_script:"labels-semana" }}
+                                    {{ chart_data_semana|json_script:"data-semana" }}
+                                    {{ chart_data_mes|json_script:"data-mes" }}
+                                    {{ chart_data_anio|json_script:"data-anio" }}
+                                    {{ chart_labels_anio|json_script:"labels-anio" }}
+                                    <button class="btn-filter active" onclick="updateChart('semana')">Semana</button>
+                                    <button class="btn-filter" onclick="updateChart('mes')">Mes</button>
+                                    <button class="btn-filter" onclick="updateChart('año')">Año</button>
+                                </div>
+                            </div>
+                            
+                            <div class="chart-container" style="position: relative; height:200px; width:100%">
+                                <canvas id="lineChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="summary-cards">
+                            <div class="info-card">
+                                <div class="info-icon blue">
+                                    <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> 
+                                </div>
+                                <div class="info-content">
+                                    <p>Citas para hoy</p>
+                                    <h2>{{ citas_hoy }}</h2>
+                                    <span class="trend">↗ 2 más que ayer</span>
+                                </div>
+                            </div>
+                            <div class="info-card">
+                                <div class="info-icon clock">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> 
+                                </div>
+                                <div class="info-content">
+                                    <p>Hora actual</p>
+                                    <h2 id="live-clock">00:00 AM</h2>
+                                    <span class="timezone">Zona horaria de Tijuana, B.C.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+            </section>
             <section id="agendas" class="section">
-                <h1>Historial de Agendas</h1>
-                <div class="table-section">
-                    <table>
+                <div class="agenda-header">
+                    <div class="header-text">
+                        <h1>Historial de agendas</h1>
+                        <p>Consulta tus próximas sesiones, revisa el estado de cada cita y encuentra rápidamente agendas por paciente o fecha.</p>
+                    </div>
+                </div>
+
+                <div class="agenda-controls">
+                    <div class="search-inputs">
+                        <div class="input-group">
+                            <span class="icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg>
+                            </span>
+                            <input type="text" placeholder="Buscar por paciente">
+                        </div>
+                        <div class="input-group">
+                            <span class="icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                            </span>
+                            <input type="text" placeholder="Buscar por fecha">
+                        </div>
+                    
+                        <div class="filter-pills">
+                            <button class="btn-pill active">Todas</button>
+                            <button class="btn-pill">Pendientes</button>
+                            <button class="btn-pill">Confirmadas</button>
+                            <button class="btn-pill">Completadas</button>
+                        </div>
+                    </div>
+                    <div class="summary-box">
+                        <p>Sesiones programadas esta semana</p>
+                        <h2>{{ agendas.count }} citas</h2>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="custom-table">
                         <thead>
                             <tr>
                                 <th>Fecha</th>
                                 <th>Hora</th>
                                 <th>Paciente</th>
+                                <th>Modalidad</th>
                                 <th>Estado</th>
-                                <th>Acciones</th> </tr>
+                                <th>Acciones</th>
+                            </tr>
                         </thead>
                         <tbody>
                             {% for item in agendas %}
                             <tr>
                                 <td>{{ item.fecha|date:"d/m/Y" }}</td>
-                                <td>{{ item.hora|time:"h:i A" }}</td>
-                                <td>{{ item.paciente.usuario.nombrePila }} {{ item.paciente.usuario.primerApellido }}</td>
-                                <td><span class="badge {{ item.estado.nombre|lower }}">{{ item.estado.nombre }}</span></td>
+                                <td><strong>{{ item.hora|time:"h:i A" }}</strong></td>
                                 <td>
+                                    <div class="patient-cell">
+                                        <img src="{{ item.paciente.usuario.fotoPerfil.url }}" class="table-avatar">
+                                        <div>
+                                            <p class="p-name">{{ item.paciente.usuario.nombrePila }} {{ item.paciente.usuario.primerApellido }}</p>
+                                            <p class="p-service">{{ item.servicio.nombre }}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ item.modalidad.nombre }}</td>
+                                <td>
+                                    <span class="status-badge {{ item.estado.nombre|lower }}">
+                                        {{ item.estado.nombre }}
+                                    </span>
+                                </td>
+                                <td class="actions-cell">
                                     {% if item.estado.nombre == "Pendiente" %}
-                                    <button onclick="abrirModalConsulta('{{ item.numero }}', '{{ item.paciente.usuario.nombrePila }}')" class="btn-atender">
-                                        Atender
-                                    </button>
+                                    <button onclick="abrirSesion('Juan Perez', '/media/foto.jpg')" class="btn-table btn-atender">Atender</button>
+                                    {% elif item.estado.nombre == "Atendida" %}
+                                    <button class="btn-table btn-resumen">Resumen</button>
                                     {% endif %}
+                                    <button class="btn-table btn-view">Ver cita</button>
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
-
-                        <div id="modalConsulta" class="modal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
-                            <div class="modal-content" style="background:white; margin:10% auto; padding:20px; width:50%; border-radius:8px;">
-                                <h2 id="modal-titulo">Atender Consulta</h2>
-                                <form id="formConsulta">
-                                    <input type="hidden" id="cita_id">
-                                    <label>Notas:</label>
-                                    <textarea id="notas" style="width:100%; height:80px; margin-bottom:10px;"></textarea>
-                                    
-                                    <label>Diagnóstico:</label>
-                                    <textarea id="diagnostico" style="width:100%; height:80px; margin-bottom:10px;"></textarea>
-                                    
-                                    <label>Observaciones de Sesión:</label>
-                                    <textarea id="observaciones" style="width:100%; height:80px; margin-bottom:10px;"></textarea>
-                                    
-                                    <label>Monto del Pago ($):</label>
-                                    <input type="number" id="monto" value="500" style="width:100%; margin-bottom:20px;">
-                                    
-                                    <div style="text-align:right;">
-                                        <button type="button" onclick="cerrarModal()" style="background:#6c757d; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">Cancelar</button>
-                                        <button type="submit" style="background:#3b82f6; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">Guardar Consulta</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
                     </table>
                 </div>
             </section>
+            <section id="seccion-sesion" class="section" style="display:none;">
+                <div class="session-container">
+                    
+                    <div class="session-main-card">
+                        <div class="step-header">
+                            <h2 id="session-title">Evaluación de la Sesión</h2>
+                            <p id="step-indicator">Paso 1 de 3</p>
+                            <div class="progress-bar-container">
+                                <div class="progress-step active" id="bar-1"></div>
+                                <div class="progress-step" id="bar-2"></div>
+                                <div class="progress-step" id="bar-3"></div>
+                            </div>
+                        </div>
 
+                        <form id="form-multistep-sesion">
+                            {% csrf_token %}
+                            <input type="hidden" name="cita_id" id="sesion-cita-id">
+
+                            <div class="step-content" id="step-1">
+                                <h4 class="step-subtitle">
+                                    <svg width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <defs>
+                                            <style>.cls-1{fill:none;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.5px;fill-rule:evenodd;}</style>
+                                        </defs>
+                                        <g id="ic-medicine-heart-beat">
+                                            <path class="cls-1" d="M9.07,16m6.22-.36L12,18.88h0L9.07,16m6.22-.36M19.93,10,4.46,11.08A4.07,4.07,0,0,1,11,6.31L12,7.36l1.05-1.05a4.07,4.07,0,0,1,5.76,0A4.12,4.12,0,0,1,19.93,10M4.46,11.08m3.89,4.15"/>
+                                            <polyline class="cls-1" points="2 15 6 15 10 10 13 13 21 13"/>
+                                        </g>
+                                    </svg>
+                                    Estado Emocional Inicial</h4>
+                                <p class="step-description">Evalúa cómo llega el paciente a la sesión (1: Muy bajo - 10: Muy alto).</p>
+                                
+                                <div class="rating-container">
+                                    <div class="rating-group">
+                                        <label>Nivel de Ansiedad</label>
+                                        <div class="rating-scale" data-name="ansiedad">
+                                            {% for i in "123456789"|make_list %}<button type="button" class="btn-rate" data-value="{{forloop.counter}}">{{forloop.counter}}</button>{% endfor %}
+                                            <button type="button" class="btn-rate" data-value="10">10</button>
+                                            <input type="hidden" name="ansiedad" required>
+                                        </div>
+                                    </div>
+
+                                    <div class="rating-group">
+                                        <label>Nivel de Tristeza</label>
+                                        <div class="rating-scale" data-name="tristeza">
+                                            {% for i in "123456789"|make_list %}<button type="button" class="btn-rate" data-value="{{forloop.counter}}">{{forloop.counter}}</button>{% endfor %}
+                                            <button type="button" class="btn-rate" data-value="10">10</button>
+                                            <input type="hidden" name="tristeza" required>
+                                        </div>
+                                    </div>
+
+                                    <div class="rating-group">
+                                        <label>Nivel de Estrés</label>
+                                        <div class="rating-scale" data-name="estres">
+                                            {% for i in "123456789"|make_list %}<button type="button" class="btn-rate" data-value="{{forloop.counter}}">{{forloop.counter}}</button>{% endfor %}
+                                            <button type="button" class="btn-rate" data-value="10">10</button>
+                                            <input type="hidden" name="estres" required>
+                                        </div>
+                                    </div>
+
+                                    <div class="rating-group">
+                                        <label>Ánimo General</label>
+                                        <div class="rating-scale" data-name="animo_general">
+                                            {% for i in "123456789"|make_list %}<button type="button" class="btn-rate" data-value="{{forloop.counter}}">{{forloop.counter}}</button>{% endfor %}
+                                            <button type="button" class="btn-rate" data-value="10">10</button>
+                                            <input type="hidden" name="animo_general" required>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="step-content" id="step-2" style="display:none;">
+                                <h4 class="step-subtitle">📄 Desarrollo de la Consulta</h4>
+                                
+                                <div class="form-area">
+                                    <div class="input-group">
+                                        <label>Notas Clínicas (Detalle de la sesión)</label>
+                                        <textarea name="notas" rows="6" placeholder="Escribe aquí el desarrollo de la sesión..." required></textarea>
+                                    </div>
+
+                                    <div class="grid-2-col">
+                                        <div class="input-group">
+                                            <label>Observaciones de conducta</label>
+                                            <textarea name="conducta" rows="3" placeholder="Lenguaje no verbal, actitud..."></textarea>
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Diagnóstico / Impresión Clínica</label>
+                                            <textarea name="diagnostico" rows="3" placeholder="Hipotésis actual..."></textarea>
+                                        </div>
+                                    </div>
+
+                                    <div class="input-group">
+                                        <label>Resumen para el Paciente (Opcional)</label>
+                                        <textarea name="resumen" rows="2" placeholder="Puntos clave acordados..."></textarea>
+                                    </div>
+
+                                    <div class="medication-section">
+                                        <h5>💊 Medicación (Si aplica)</h5>
+                                        <div class="grid-3-col">
+                                            <input type="text" name="med_nombre" placeholder="Nombre del medicamento">
+                                            <input type="text" name="med_dosis" placeholder="Dosis (Ej: 50mg)">
+                                            <input type="text" name="med_frecuencia" placeholder="Frecuencia (Ej: Cada 12h)">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="step-content" id="step-3" style="display:none;">
+                                <h4 class="step-subtitle">🎯 Plan de Trabajo y Tareas</h4>
+                                
+                                <div class="form-area">
+                                    <div class="input-group">
+                                        <label>Objetivos Terapéuticos (Para las siguientes sesiones)</label>
+                                        <textarea name="plan_objetivos" rows="4" placeholder="¿Qué buscamos lograr?"></textarea>
+                                    </div>
+
+                                    <div class="grid-2-col">
+                                        <div class="input-group">
+                                            <label>Técnicas / Herramientas a utilizar</label>
+                                            <textarea name="plan_tecnicas" rows="3" placeholder="Ej: TCC, Relajación..."></textarea>
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Frecuencia de sesiones sugerida</label>
+                                            <input type="text" name="plan_frecuencia" placeholder="Ej: Semanal, Quincenal">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="final-check">
+                                        <p>⚠️ Asegúrate de haber revisado todas las pestañas antes de finalizar.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="step-footer">
+                                <button type="button" class="btn-secondary" onclick="changeStep(-1)" id="btn-prev" style="visibility:hidden;">← Atrás</button>
+                                <button type="button" class="btn-primary" onclick="changeStep(1)" id="btn-next">Siguiente →</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <aside class="patient-sidebar">
+                        <div class="sidebar-card">
+                            <h3>Expediente del Paciente</h3>
+                            
+                            <div class="sidebar-profile">
+                                <img id="side-avatar" src="{% static 'img/default.png' %}" class="side-avatar">
+                                <h4 id="side-name">Cargando...</h4>
+                                <p id="side-ocupacion" class="p-ocupacion">Ocupación</p>
+                                <p id="side-meta">Edad • Estado Civil</p>
+                            </div>
+                            
+                            <div class="sidebar-info-section" id="side-riesgos-container" style="display:none;">
+                                <h5> 
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg>
+                                    RIESGOS Y ALERTAS</h5>
+                                <div class="tags" id="side-riesgos-tags">
+                                    </div>
+                            </div>
+
+                            <div class="sidebar-tabs">
+                                <button class="tab-btn active" onclick="switchSidebarTab(this, 'tab-antecedentes')">Antecedentes</button>
+                                <button class="tab-btn" onclick="switchSidebarTab(this, 'tab-evolucion')">Evolución</button>
+                            </div>
+
+                            <div class="sidebar-tab-content">
+                                <div id="tab-antecedentes" class="tab-pane active">
+                                    <div class="info-item">
+                                        <label>Personales:</label>
+                                        <p id="side-ant-personales">No registrados.</p>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Familiares:</label>
+                                        <p id="side-ant-familiares">No registrados.</p>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Psicológicos:</label>
+                                        <p id="side-ant-psicologicos">No registrados.</p>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Traumas:</label>
+                                        <p id="side-ant-traumas">No registrados.</p>
+                                    </div>
+                                </div>
+
+                                <div id="tab-evolucion" class="tab-pane" style="display:none;">
+                                    <div class="timeline" id="side-evolucion-timeline">
+                                        <p class="text-muted">Cargando historial...</p>
+                                        </div>
+                                </div>
+                            </div>
+
+                            <button class="btn-edit-exp" onclick="abrirEdicionExpediente()"><i class="fas fa-edit"></i> Editar Expediente Completo</button>
+                        </div>
+                    </aside>
+                </div>
+            </section>
+            <div id="modalConsulta" class="modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
+                <div class="modal-content" style="background:white; margin:5% auto; padding:20px; width:50%; border-radius:12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+                    <h2 id="modal-titulo">Atender Consulta</h2>
+                    <form id="formConsulta">
+                        <input type="hidden" id="cita_id">
+                        <div style="margin-bottom: 15px;">
+                            <label>Notas de la sesión:</label>
+                            <textarea id="notas" style="width:100%; height:100px; border-radius: 8px; border: 1px solid #ddd;"></textarea>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label>Diagnóstico:</label>
+                            <textarea id="diagnostico" style="width:100%; height:80px; border-radius: 8px; border: 1px solid #ddd;"></textarea>
+                        </div>
+                        <div style="text-align:right;">
+                            <button type="button" onclick="cerrarModal()" style="background:#e2e8f0; color:#475569; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; margin-right: 10px;">Cancelar</button>
+                            <button type="submit" style="background:#00a0b1; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;">Guardar Consulta</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
             <section id="mensajes" class="section">
                 <div class="card-chat-container">
                     <div class="chat-sidebar">
                         <div class="chat-sidebar-header">
                             <h3>Mis Pacientes</h3>
+                        </div>
+                        <div class="search-box-t">
                             <div class="search-box">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg>
                                 <input type="text" id="buscarPaciente" placeholder="Buscar paciente..." onkeyup="filtrarPacientes()">
                             </div>
                         </div>
-                        
                         <ul id="lista-pacientes-chat">
                             {% for pac in mis_pacientes %}
                             <li class="chat-item {% if pac.sin_leer %}unread{% endif %}" 
@@ -237,6 +674,73 @@
 
                 <div class="patients-grid" id="patients-grid">
                     </div>
+            </section>
+            <section id="expediente-detalle" class="section" style="display: none;">
+                <div class="breadcrumb">Pacientes > <span>Expediente</span></div>
+                
+                <div class="patient-header-card">
+                    <button onclick="volverALista()" class="btn-back">← Volver</button>
+                    <div class="patient-info-main">
+                        <img id="exp-foto" src="" style="width: 100px; height: 100px; border-radius: 10px;">
+                        <div>
+                            <h2 id="exp-nombre"></h2>
+                            <div class="info-grid">
+                                <p><strong>OCUPACIÓN:</strong> <span id="exp-ocupacion"></span></p>
+                                <p><strong>ESTADO CIVIL:</strong> <span id="exp-civil"></span></p>
+                                <p><strong>FECHA NACIMIENTO:</strong> <span id="exp-nacimiento"></span></p>
+                                <p><strong>CREACIÓN EXPEDIENTE:</strong> <span id="exp-creacion"></span></p>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn-edit">Editar datos</button>
+                </div>
+
+                <div class="main-content-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Antecedentes y Traumas</h3>
+                            <button class="btn-small">Editar</button>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Traumas:</strong> <br><span id="exp-traumas"></span></p>
+                            <p><strong>Personales:</strong> <br><span id="exp-pers"></span></p>
+                            <p><strong>Psicológicos:</strong> <br><span id="exp-psico"></span></p>
+                            <p><strong>Familiares:</strong> <br><span id="exp-fam"></span></p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                            <h3>Evolución del Paciente</h3>
+                            <button class="btn-add-note" onclick="mostrarInputNota()">+ Agregar Nota</button>
+                        </div>
+
+                        <div id="nueva-nota-container" style="display: none; margin-bottom: 20px; background: #f9f9f9; padding: 15px; border-radius: 8px;">
+                            <textarea id="texto-nueva-nota" placeholder="Escribe el avance del paciente..." style="width: 100%; height: 80px; margin-bottom: 10px;"></textarea>
+                            <button onclick="guardarEvolucion()">Guardar Nota</button>
+                            <button onclick="document.getElementById('nueva-nota-container').style.display='none'">Cancelar</button>
+                        </div>
+
+                        <div id="lista-evoluciones" class="timeline-container">
+                            </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Historial de Consultas y Citas</h3>
+                        </div>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Hora</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-historial">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
             </section>
             <section id="consultas" class="section" style="display:none;">
                 <h1>Historial de Consultas Médicas</h1>
@@ -334,6 +838,7 @@
             if(element) element.classList.add('active');
         }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{% static 'js/psicologo.js' %}"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>

@@ -136,9 +136,8 @@ class Servicio(models.Model):
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(blank=True, null=True)
     precio = models.DecimalField(max_digits=10, decimal_places=2)
-    # Nuevos campos
     especialidad = models.ForeignKey(Especialidad, on_delete=models.CASCADE, related_name='servicios')
-    es_grupal_posible = models.BooleanField(default=False) # Si el servicio admite grupos
+    es_grupal_posible = models.BooleanField(default=False) 
     max_personas = models.IntegerField(default=1)
 
     def __str__(self):
@@ -154,14 +153,15 @@ class Psicologo(models.Model):
     cedula = models.CharField(max_length=50)
     especialidad = models.ForeignKey(Especialidad, on_delete=models.CASCADE)
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    presentacion = models.TextField(blank=True, null=True) 
 
 
 class Horario(models.Model):
     numero = models.AutoField(primary_key=True)
-    nombre = models.CharField(max_length=100) # Ej: Turno Matutino
-    dias = models.CharField(max_length=100)   # Ej: Lunes a Viernes
-    horas = models.CharField(max_length=100)  # Ej: 08:00 AM - 02:00 PM
-    icono = models.CharField(max_length=50, default='sun') # Slug para el icono
+    nombre = models.CharField(max_length=100) 
+    dias = models.CharField(max_length=100)   
+    horas = models.CharField(max_length=100)  
+    icono = models.CharField(max_length=50, default='sun')
     activo = models.BooleanField(default=True)
 
     def __str__(self):
@@ -183,17 +183,34 @@ class HorPsicologo(models.Model):
 class Paciente(models.Model):
     numero = models.AutoField(primary_key=True)
     fechaNacimiento = models.DateField()
+
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
 
 
 class Expediente(models.Model):
     numero = models.AutoField(primary_key=True)
     fechaCreacion = models.DateField()
-    antecedentes = models.TextField()
     traumas = models.TextField()
-    sintomas = models.TextField()
-    evolucion = models.TextField()
+    riesgos = models.TextField(blank=True, null=True)
+    ocupacion = models.CharField(max_length=100, blank=True, null=True)
+    estado_civil = models.CharField(max_length=50, blank=True, null=True)
+
     paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE)
+
+class Antecedentes(models.Model):
+    numero = models.AutoField(primary_key=True)
+    personales = models.TextField()
+    psicologicos = models.TextField()
+    familiares = models.TextField()
+
+    expediente = models.ForeignKey(Expediente, on_delete=models.CASCADE)
+
+class Evolucion(models.Model):
+    numero = models.AutoField(primary_key=True)
+    fecha = models.DateField()
+    notas = models.TextField()
+
+    expediente = models.ForeignKey(Expediente, on_delete=models.CASCADE)
 
 
 # ========================
@@ -241,17 +258,43 @@ class Cita(models.Model):
 
 class Consulta(models.Model):
     numero = models.AutoField(primary_key=True)
-    notas = models.TextField()
-    diagnostico = models.TextField()
     cita = models.ForeignKey(Cita, on_delete=models.CASCADE)
 
 
 class Sesion(models.Model):
     numero = models.AutoField(primary_key=True)
-    numSesion = models.IntegerField()
+    notas = models.TextField()
     observaciones = models.TextField()
+    resumen = models.TextField()
+    conducta = models.TextField()
+    diagnostico = models.TextField()
+
     consulta = models.ForeignKey(Consulta, on_delete=models.CASCADE)
 
+class Medicacion(models.Model):
+    numero = models.AutoField(primary_key=True)
+    medicamento = models.CharField(max_length=100)
+    dosis = models.CharField(max_length=50)
+    frecuencia = models.CharField(max_length=50)
+
+    sesion = models.ForeignKey(Sesion, on_delete=models.CASCADE)
+
+class EdoEmocional(models.Model):
+    numero = models.AutoField(primary_key=True)
+    ansiedad = models.IntegerField()
+    tristeza = models.IntegerField()
+    estres = models.IntegerField()
+    animo_general = models.IntegerField()
+
+    sesion = models.ForeignKey(Sesion, on_delete=models.CASCADE)
+
+class PlanTrabajo(models.Model):
+    numero = models.AutoField(primary_key=True)
+    objetivos = models.TextField()
+    frecuencia_sesion = models.CharField(max_length=50)
+    tecnicas = models.TextField()
+
+    sesion = models.ForeignKey(Sesion, on_delete=models.CASCADE)
 
 # ========================
 # PAGOS Y FACTURAS
@@ -262,7 +305,7 @@ class Pago(models.Model):
     fecha = models.DateField()
     hora = models.TimeField()
     monto = models.DecimalField(max_digits=10, decimal_places=2)
-    consulta = models.ForeignKey(Consulta, on_delete=models.CASCADE)
+    sesion = models.ForeignKey(Sesion, on_delete=models.CASCADE)
 
 
 class Factura(models.Model):

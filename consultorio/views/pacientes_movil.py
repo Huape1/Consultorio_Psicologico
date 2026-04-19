@@ -1,4 +1,4 @@
-from models import Paciente, Telefono, Psicologo, Mensaje, Cita, Modalidad, EdoCita, Servicio
+from ..models import Paciente, Telefono, Psicologo, Mensaje, Cita, Modalidad, EdoCita, Servicio
 from rest_framework.decorators import api_view
 from datetime import date
 from rest_framework.response import Response

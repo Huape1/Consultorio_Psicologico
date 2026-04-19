@@ -28,7 +28,7 @@ SECRET_KEY = 'django-insecure-i4ktffqx5f*$!l!-38g&7os2$!hwtvpfnsaqzfe#a)hqwv)+by
 DEBUG = True
 
 # Permite que el emulador y tu PC local entren
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.100.9']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.100.4']
 
 # Application definition
 
@@ -123,7 +123,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es-mx'
 
 TIME_ZONE = 'America/Tijuana'
 
