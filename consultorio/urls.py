@@ -76,4 +76,5 @@ urlpatterns = [
     path('api/psicologo/agenda/', psicologos_movil.get_agenda_diaria, name='get_agenda_diaria'),
     path('api/psicologo/perfil/', psicologos_movil.get_perfil_psicologo), 
     path('api/psicologo/actualizar-perfil/', psicologos_movil.actualizar_perfil_psicologo), 
+    path('psicologo/expediente-api/', psicologos_movil.api_obtener_expediente_lateral, name='expediente_api'),
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

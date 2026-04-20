@@ -1,7 +1,8 @@
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from datetime import datetime as dt
-from ..models import Paciente, Telefono, Psicologo, Cita, Usuario
+from datetime import date, datetime as dt
+from ..models import Paciente, Telefono, Psicologo, Cita, Usuario, Mensaje, Expediente, Evolucion, Antecedentes
+from django.db.models import Q
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from django.http import JsonResponse
@@ -16,34 +17,63 @@ User = get_user_model()
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def psicologo_dashboard(request):
-    # Obtener la instancia del psicólogo
     psicologo = get_object_or_404(Psicologo, usuario=request.user)
     hoy = timezone.now().date()
+    ahora = timezone.localtime(timezone.now())
 
-    # 1. Estadísticas
-    citas_hoy = Cita.objects.filter(psicologo=psicologo, fecha=hoy)
-    pendientes = citas_hoy.filter(estado__nombre='Pendiente').count()
-    
-    # 2. Citas del día (formateadas para el ListView)
+    # 1. Mensajes no leídos (Conteo real)
+    mensajes_sin_leer = Mensaje.objects.filter(
+        conversacion__convusuario__usuario=request.user,
+        leido=False
+    ).exclude(usuario=request.user).count()
+
+    # 2. Próxima Cita (La que sigue a partir de ahorita)
+    proxima_cita_obj = Cita.objects.filter(
+        psicologo=psicologo,
+        estado__nombre__in=['Pendiente', 'Confirmada'],
+        fecha__gte=hoy
+    ).filter(
+        Q(fecha__gt=hoy) | Q(fecha=hoy, hora__gte=ahora.time())
+    ).order_by('fecha', 'hora').first()
+
+    # 3. Lista de 3 citas siguientes (excluyendo la próxima)
+    citas_siguientes_qs = Cita.objects.filter(
+        psicologo=psicologo,
+        fecha__gte=hoy
+    ).exclude(
+        numero=proxima_cita_obj.numero if proxima_cita_obj else -1
+    ).order_by('fecha', 'hora')[:3]
+
+    # Formatear lista de citas
     citas_lista = []
-    for c in citas_hoy.order_by('hora'):
+    for c in citas_siguientes_qs:
         citas_lista.append({
             "id": c.numero,
             "paciente_nombre": f"{c.paciente.usuario.nombrePila} {c.paciente.usuario.primerApellido}",
             "hora": c.hora.strftime("%H:%M"),
+            "fecha": c.fecha.strftime("%d/%m/%Y"),
             "estado": c.estado.nombre,
             "tipo": c.servicio.nombre,
-            "foto_paciente": request.build_absolute_uri(c.paciente.usuario.fotoPerfil.url) if c.paciente.usuario.fotoPerfil else None
         })
 
     return JsonResponse({
         "nombre_psicologo": f"{request.user.nombrePila} {request.user.primerApellido}",
+        "foto_psicologo": request.build_absolute_uri(request.user.fotoPerfil.url) if request.user.fotoPerfil else None,
         "stats": {
-            "total_hoy": citas_hoy.count(),
-            "pendientes": pendientes,
-            "mensajes": 3 # O conteo real de mensajes sin leer
+            "total_hoy": Cita.objects.filter(psicologo=psicologo, fecha=hoy).count(),
+            "mensajes_no_leidos": mensajes_sin_leer,
+            "pacientes_activos": Paciente.objects.filter(cita__psicologo=psicologo).distinct().count()
         },
-        "citas": citas_lista
+        "proxima_cita": {
+            "id": proxima_cita_obj.numero,
+            "paciente_nombre": f"{proxima_cita_obj.paciente.usuario.nombrePila} {proxima_cita_obj.paciente.usuario.primerApellido}",
+            "hora": proxima_cita_obj.hora.strftime("%H:%M"),
+            "fecha": proxima_cita_obj.fecha.strftime("%d/%m/%Y"),
+            "tipo": proxima_cita_obj.servicio.nombre,
+            "estado": proxima_cita_obj.estado.nombre,
+            "foto_paciente": request.build_absolute_uri(proxima_cita_obj.paciente.usuario.fotoPerfil.url) if proxima_cita_obj.paciente.usuario.fotoPerfil else None,
+        } if proxima_cita_obj else None,
+        "citas_siguientes": citas_lista
     })
     
 #Pantalla de pacientes del psicólogo
@@ -51,24 +81,26 @@ def psicologo_dashboard(request):
 @permission_classes([IsAuthenticated])
 def get_mis_pacientes(request):
     psicologo = get_object_or_404(Psicologo, usuario=request.user)
-    
-    # Obtenemos pacientes únicos que han tenido citas con este psicólogo
-    # Además contamos cuántas sesiones 'Realizadas' tienen
     pacientes_qs = Paciente.objects.filter(cita__psicologo=psicologo).distinct()
     
     data = []
     for p in pacientes_qs:
         sesiones_count = Cita.objects.filter(
             paciente=p, 
-            psicologo=psicologo, 
+            psicologo=psicologo,
             estado__nombre='Realizada'
         ).count()
-        
+
+        # Obtenemos el teléfono del usuario
+        tel_obj = Telefono.objects.filter(usuario=p.usuario).first()
+
         data.append({
             "id": p.numero,
             "nombre_completo": f"{p.usuario.nombrePila} {p.usuario.primerApellido}",
             "sesiones_completadas": sesiones_count,
-            "foto": request.build_absolute_uri(p.usuario.fotoPerfil.url) if p.usuario.fotoPerfil else None,
+            "correo": p.usuario.correo, # <--- AGREGADO
+            "telefono": tel_obj.numTel if tel_obj else "Sin teléfono", # <--- AGREGADO
+            "foto_perfil": request.build_absolute_uri(p.usuario.fotoPerfil.url) if p.usuario.fotoPerfil else None, # <--- LLAVE UNIFICADA
         })
         
     return JsonResponse(data, safe=False)
@@ -149,3 +181,57 @@ def actualizar_perfil_psicologo(request):
         return JsonResponse({"status": "success", "message": "Perfil actualizado"})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_obtener_expediente_lateral(request):
+    # Obtenemos el ID desde los parámetros de la URL (?paciente_id=X)
+    paciente_id = request.query_params.get('paciente_id')
+    
+    if not paciente_id:
+        return JsonResponse({'error': 'Falta ID de paciente'}, status=400)
+
+    try:
+        # 1. Obtener el paciente (verificando que existe)
+        paciente = get_object_or_404(Paciente, numero=paciente_id)
+        
+        # 2. Intentar obtener el expediente
+        expediente = Expediente.objects.filter(paciente=paciente).first()
+        if not expediente:
+            return JsonResponse({'error': 'Este paciente aún no tiene un expediente creado'}, status=404)
+
+        # 3. Obtener Antecedentes (principal por expediente)
+        antecedentes = Antecedentes.objects.filter(expediente=expediente).first()
+        
+        # 4. Obtener Evoluciones (últimas 5)
+        evoluciones_qs = Evolucion.objects.filter(expediente=expediente).order_by('-fecha')[:5]
+        evoluciones_list = []
+        for evo in evoluciones_qs:
+            evoluciones_list.append({
+                'fecha': evo.fecha.strftime('%d/%m/%Y'),
+                'notas': evo.notas
+            })
+
+        # 5. Calcular Edad
+        today = date.today()
+        born = paciente.fechaNacimiento
+        edad = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+        # 6. Construir respuesta
+        data = {
+            'edad': edad,
+            'ocupacion': expediente.ocupacion or "No especificada",
+            'estado_civil': expediente.estado_civil or "No especificado",
+            'riesgos': expediente.riesgos or "Sin riesgos registrados",
+            'traumas': expediente.traumas or "Sin traumas registrados",
+            'ant_personales': antecedentes.personales if antecedentes else "Sin registros",
+            'ant_familiares': antecedentes.familiares if antecedentes else "Sin registros",
+            'ant_psicologicos': antecedentes.psicologicos if antecedentes else "Sin registros",
+            'evoluciones': evoluciones_list
+        }
+
+        return JsonResponse(data)
+
+    except Exception as e:
+        print(f"Error en api_obtener_expediente_lateral: {e}")
+        return JsonResponse({'error': 'Error interno del servidor'}, status=500)
