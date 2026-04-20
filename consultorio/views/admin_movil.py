@@ -1,6 +1,8 @@
 import datetime  
+from django.utils import timezone
+from django.core.files.storage import default_storage
 from django.db import transaction
-from ..models import Usuario, TipoUsuario, Paciente, Telefono, EdoCuenta, Especialidad, Horario, Psicologo, Mensaje, Cita
+from ..models import Usuario, TipoUsuario, Paciente, Telefono, EdoCuenta, Especialidad, Horario, Psicologo, Mensaje, Cita, Conversacion, ConvUsuario
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -18,30 +20,58 @@ User = get_user_model()
 #Panel pirncipal
 @csrf_exempt
 def api_admin_stats(request):
-    # 1. Conteos
+    # 1. Validar usuario de forma segura para evitar el error de AnonymousUser
+    user = request.user
+    admin_name = "Admin"
+    admin_photo = None
+
+    if not user.is_anonymous:
+        admin_name = user.nombrePila if hasattr(user, 'nombrePila') else user.username
+        if user.fotoPerfil:
+            admin_photo = request.build_absolute_uri(user.fotoPerfil.url)
+
+    # 2. Conteos básicos
     stats = {
         'activePsychologists': Psicologo.objects.count(),
         'registeredPatients': Paciente.objects.count(),
         'pendingMessages': Mensaje.objects.filter(leido=False).count(),
         'todayAppointments': Cita.objects.filter(fecha=datetime.date.today()).count(),
+        'currentAdminName': admin_name,
+        'currentAdminPhoto': admin_photo,
     }
     
-    # 2. Últimos 3 mensajes
+    # 3. Últimos 3 mensajes (CORREGIDO: order_by)
+    # Usamos order_by para ordenar por fecha de envío descendente
     mensajes = Mensaje.objects.select_related('usuario').order_by('-fechaEnvio')[:3]
-    stats['recentMessages'] = [{
-        'user': f"{m.usuario.nombrePila} {m.usuario.primerApellido}",
-        'content': m.contenido,
-        'timestamp': m.fechaEnvio.strftime('%H:%M'),
-        'isHigh': not m.leido # Marcamos como "importante" si no se ha leído
-    } for m in mensajes]
     
-    # 3. Lista de Administradores (Rol 3)
+    stats['recentMessages'] = []
+    for m in mensajes:
+        foto_m = None
+        if m.usuario.fotoPerfil:
+            foto_m = request.build_absolute_uri(m.usuario.fotoPerfil.url)
+            
+        stats['recentMessages'].append({
+            'user': f"{m.usuario.nombrePila} {m.usuario.primerApellido}",
+            'content': m.contenido,
+            'timestamp': m.fechaEnvio.strftime('%H:%M'),
+            'isHigh': not m.leido,
+            'photo': foto_m
+        })
+    
+    # 4. Lista de Administradores
     admins = Usuario.objects.filter(tipoUsuario__clave=3)
-    stats['adminList'] = [{
-        'fullName': f"{a.nombrePila} {a.primerApellido}",
-        'role': 'Administrador del Sistema',
-        'status': 'online' if a.is_active else 'offline'
-    } for a in admins]
+    stats['adminList'] = []
+    for a in admins:
+        foto_a = None
+        if a.fotoPerfil:
+            foto_a = request.build_absolute_uri(a.fotoPerfil.url)
+            
+        stats['adminList'].append({
+            'fullName': f"{a.nombrePila} {a.primerApellido}",
+            'role': 'Administrador del Sistema',
+            'status': 'Activo' if a.is_active else 'Inactivo',
+            'photo': foto_a
+        })
 
     return JsonResponse(stats)
     
@@ -262,36 +292,102 @@ def api_manage_admin(request, pk=None):
 @permission_classes([IsAuthenticated])
 def get_user_profile(request):
     user = request.user
-    # Intentamos obtener el teléfono si existe
     tel = Telefono.objects.filter(usuario=user).first()
     
     return Response({
-        "full_name": f"{user.nombrePila} {user.primerApellido} {user.segundoApellido}",
+        "nombre": user.nombrePila,
+        "apellido1": user.primerApellido,
+        "apellido2": user.segundoApellido,
         "email": user.correo,
+        "genero": user.genero,
         "phone": tel.numTel if tel else "",
         "photo": request.build_absolute_uri(user.fotoPerfil.url) if user.fotoPerfil else None,
-        "role": user.tipoUsuario.nombre if user.tipoUsuario else "Administrador"
+        "role": user.tipoUsuario.nombre if user.tipoUsuario else "Admin"
     })
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_user_profile(request):
     user = request.user
-    data = request.data
+    # Para datos de texto
+    user.nombrePila = request.data.get('nombre', user.nombrePila)
+    user.primerApellido = request.data.get('apellido1', user.primerApellido)
+    user.segundoApellido = request.data.get('apellido2', user.segundoApellido)
+    user.correo = request.data.get('email', user.correo)
+    user.genero = request.data.get('genero', user.genero)
     
-    # Actualizar nombre (ejemplo simple, puedes separar nombre de apellidos)
-    if 'full_name' in data:
-        nombres = data['full_name'].split(' ')
-        user.nombrePila = nombres[0]
-        if len(nombres) > 1:
-            user.primerApellido = nombres[1]
-        user.save()
-        
-    # Actualizar teléfono
-    if 'phone' in data:
+    # Para la foto (si se envía un archivo)
+    if 'foto' in request.FILES:
+        user.fotoPerfil = request.FILES['foto']
+    
+    user.save()
+
+    if 'phone' in request.data:
         Telefono.objects.update_or_create(
             usuario=user, 
-            defaults={'numTel': data['phone']}
+            defaults={'numTel': request.data['phone']}
         )
         
-    return Response({"message": "Perfil actualizado"})
+    return Response({"status": "success", "message": "Perfil actualizado"})
+
+#Pantalla soporte
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_lista_soporte_admin(request):
+    """Lista todos los usuarios que tienen un chat abierto con soporte (Admins)"""
+    # Buscamos todas las conversaciones donde participa el admin actual
+    mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion', flat=True)
+    
+    # Buscamos a los "otros" en esas conversaciones
+    relaciones_otros = ConvUsuario.objects.filter(
+        conversacion__in=mis_convs
+    ).exclude(usuario=request.user).select_related('usuario', 'conversacion')
+
+    data = []
+    for rel in relaciones_otros:
+        u = rel.usuario
+        ultimo_msg = Mensaje.objects.filter(conversacion=rel.conversacion).order_by('-fechaEnvio').first()
+        no_leidos = Mensaje.objects.filter(conversacion=rel.conversacion, leido=False).exclude(usuario=request.user).count()
+
+        data.append({
+            'id': u.numero,
+            'nombre': f"{u.nombrePila} {u.primerApellido}",
+            'foto': request.build_absolute_uri(u.fotoPerfil.url) if u.fotoPerfil else None,
+            'ultimo_msg': ultimo_msg.contenido if ultimo_msg else "Sin mensajes",
+            'tiempo': ultimo_msg.fechaEnvio.strftime('%I:%M %p') if ultimo_msg else "",
+            'unread_count': no_leidos
+        })
+    
+    return JsonResponse(data, safe=False)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_mensajes_soporte_admin(request):
+    usuario_id = request.GET.get('usuario_id')
+    mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion', flat=True)
+    
+    relacion = ConvUsuario.objects.filter(
+        conversacion__in=mis_convs, 
+        usuario_id=usuario_id
+    ).first()
+
+    if not relacion:
+        return JsonResponse([], safe=False)
+
+    mensajes = Mensaje.objects.filter(conversacion=relacion.conversacion).order_by('fechaEnvio')
+    
+    # Marcar como leídos
+    Mensaje.objects.filter(conversacion=relacion.conversacion, leido=False).exclude(usuario=request.user).update(leido=True)
+
+    data = []
+    for m in mensajes:
+        f_local = timezone.localtime(m.fechaEnvio)
+        data.append({
+            'texto': m.contenido,
+            'tipo': 'sent' if m.usuario == request.user else 'received',
+            'hora': f_local.strftime('%I:%M %p'),
+            'fecha_completa': f_local.strftime('%Y-%m-%d'),
+            'dia_str': f_local.strftime('%d de %B, %Y'),
+            'leido': m.leido
+        })
+    return JsonResponse(data, safe=False)

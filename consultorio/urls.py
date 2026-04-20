@@ -50,6 +50,7 @@ urlpatterns = [
     # Auth
     path('api/login/', auth_movil.api_login), 
     path('api/registro-api/', auth_movil.api_registro_paciente),
+    path('api/psicologo/cambiar-password/', auth_movil.cambiar_password_universal),
     #Admin
     path('admin/stats/', admin_movil.api_admin_stats),
     path('api/admin/psychologists/', admin_movil.api_get_psychologists),
@@ -62,6 +63,8 @@ urlpatterns = [
     path('api/admin/manage-admin/<int:pk>/', admin_movil.api_manage_admin, name='api_manage_admin'),
     path('api/auth/profile/', admin_movil.get_user_profile, name='get_profile'),
     path('api/auth/profile/update/', admin_movil.update_user_profile, name='update_profile'),
+    path('api/admin/soporte/lista/', admin_movil.api_lista_soporte_admin, name='admin_lista_soporte'),
+    path('api/admin/soporte/mensajes/', admin_movil.api_mensajes_soporte_admin, name='admin_mensajes_soporte'),
     #Pacientes
     path('api/paciente/dashboard/', pacientes_movil.get_paciente_dashboard, name='get_paciente_dashboard'),
     path('paciente/perfil/', pacientes_movil.get_paciente_data, name='paciente_perfil'),
@@ -70,6 +73,9 @@ urlpatterns = [
     path('paciente/agendar/', pacientes_movil.agendar_cita_api, name='agendar_cita'),
     path('api/paciente/perfils/', pacientes_movil.get_perfil_paciente),
     path('api/paciente/actualizar-perfil-api/', pacientes_movil.actualizar_perfil_api),
+    path('api/paciente/contactos/', pacientes_movil.api_get_contactos_paciente),
+    path('api/enviar-mensaje-paciente/', pacientes_movil.api_enviar_mensaje_paciente, name='api-enviar_mensaje_paciente'),
+    path('api/obtener-mensajes-paciente/', pacientes_movil.api_obtener_mensajes_paciente, name='api-obtener_mensajes_paciente'),
     #Psicologos
     path('api/psicologo/dashboard/', psicologos_movil.psicologo_dashboard, name='psicologo_dashboard'),
     path('api/psicologo/pacientes/', psicologos_movil.get_mis_pacientes), 
@@ -77,4 +83,6 @@ urlpatterns = [
     path('api/psicologo/perfil/', psicologos_movil.get_perfil_psicologo), 
     path('api/psicologo/actualizar-perfil/', psicologos_movil.actualizar_perfil_psicologo), 
     path('psicologo/expediente-api/', psicologos_movil.api_obtener_expediente_lateral, name='expediente_api'),
+    path('api/psicologo/contactos/', psicologos_movil.api_get_contactos_psicologo, name='contactos_psicologo'),
+    path('api/psicologo/mensajes/', psicologos_movil.api_obtener_mensajes_psicologo, name='mensajes_psicologo'),
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

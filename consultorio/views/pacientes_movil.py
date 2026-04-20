@@ -1,10 +1,14 @@
-from ..models import Paciente, Telefono, Psicologo, Mensaje, Cita, Modalidad, EdoCita, Servicio
+from ..models import Paciente, Telefono, Psicologo, Mensaje, Cita, Modalidad, EdoCita, Servicio, Usuario, Conversacion, ConvUsuario, TipoUsuario
 from rest_framework.decorators import api_view
 from datetime import date
 from rest_framework.response import Response
 from django.http import JsonResponse
 from django.contrib.auth import get_user_model
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes, permission_classes
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
+from django.shortcuts import  get_object_or_404
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from ..serializers import PacienteDashboardSerializer
 import locale
@@ -66,7 +70,8 @@ def get_paciente_dashboard(request):
             mensajes_list.append({
                 "remitente": f"{m.usuario.nombrePila}",
                 "contenido": m.contenido,
-                "hora": m.fechaEnvio.strftime("%I:%M %p") if m.fechaEnvio.date() == today else m.fechaEnvio.strftime("%d/%m")
+                "hora": m.fechaEnvio.strftime("%I:%M %p"),
+                "foto_remitente": request.build_absolute_uri(m.usuario.fotoPerfil.url) if m.usuario.fotoPerfil else None # <--- Esto
             })
 
         # 6. Respuesta final
@@ -94,12 +99,14 @@ def get_mis_citas(request):
         
         citas_list = []
         for c in citas:
+            usuario_psicologo = c.psicologo.usuario
             citas_list.append({
                 "fecha": c.fecha.strftime("%d/%m/%Y"),
                 "hora": c.hora.strftime("%I:%M %p"),
-                "psicologo": f"{c.psicologo.usuario.nombrePila} {c.psicologo.usuario.primerApellido}",
+                "psicologo": f"{usuario_psicologo.nombrePila} {usuario_psicologo.primerApellido}",
+                "psicologo_foto": request.build_absolute_uri(usuario_psicologo.fotoPerfil.url) if usuario_psicologo.fotoPerfil else None,
                 "servicio": c.servicio.nombre,
-                "estado": c.estado.nombre # 'Pendiente', 'Confirmada', 'Atendido', 'Cancelada'
+                "estado": c.estado.nombre 
             })
             
         return JsonResponse(citas_list, safe=False)
@@ -168,11 +175,13 @@ def get_perfil_paciente(request):
     return JsonResponse({
         "nombre": usuario.nombrePila,
         "apellido": usuario.primerApellido,
+        "segundo_apellido": usuario.segundoApellido, # Añadido
+        "nombre_completo": f"{usuario.nombrePila} {usuario.primerApellido} {usuario.segundoApellido}",
         "email": usuario.correo,
         "telefono": telefono_obj.numTel if telefono_obj else "",
         "foto_perfil": request.build_absolute_uri(usuario.fotoPerfil.url) if usuario.fotoPerfil else None,
         "genero": usuario.genero,
-        "fecha_nacimiento": paciente.fechaNacimiento.strftime("%Y-%m-%d")
+        "fecha_nacimiento": paciente.fechaNacimiento.strftime("%d/%m/%Y") # Formato más amigable
     })
 
 @api_view(['POST'])
@@ -182,18 +191,177 @@ def actualizar_perfil_api(request):
         usuario = request.user
         data = request.data
         
-        # Actualizar datos básicos del usuario
-        usuario.nombrePila = data.get('nombre', usuario.nombrePila)
-        usuario.primerApellido = data.get('apellido', usuario.primerApellido)
-        usuario.correo = data.get('email', usuario.correo)
-        usuario.save()
+        # Actualizar Foto si viene
+        if 'foto_perfil' in request.FILES:
+            usuario.fotoPerfil = request.FILES['foto_perfil']
         
-        # Actualizar teléfono
+        # Actualizar Teléfono
         if 'telefono' in data:
             telefono_obj, _ = Telefono.objects.get_or_create(usuario=usuario)
             telefono_obj.numTel = data['telefono']
             telefono_obj.save()
             
+        usuario.save()
         return JsonResponse({"status": "success", "message": "Perfil actualizado"})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
+    
+#Pantala mensajes
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def api_get_contactos_paciente(request):
+    # Lógica: Buscar psicólogos con los que el paciente tiene (o tuvo) una cita
+    # Ajusta 'Cita' y sus campos según tu modelo real
+    from ..models import Cita 
+    
+    citas = Cita.objects.filter(paciente__usuario=request.user).select_related('psicologo__usuario')
+    
+    contactos = []
+    # Usamos un set para no repetir psicólogos si hay varias citas
+    vistos = set()
+    
+    for cita in citas:
+        psi = cita.psicologo.usuario
+        if psi.numero not in vistos:
+            contactos.append({
+                'id': psi.numero,
+                'nombre': f"Dr. {psi.nombrePila} {psi.primerApellido}",
+                'ultimo_msg': "Toca para chatear" # Podrías buscar el último mensaje real aquí
+            })
+            vistos.add(psi.numero)
+            
+    return JsonResponse(contactos, safe=False)
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def api_obtener_mensajes_paciente(request):
+    psicologo_user_id = request.GET.get('psicologo_id')
+    
+    if not psicologo_user_id:
+        return JsonResponse({'error': 'Falta el ID del receptor'}, status=400)
+
+    # --- LÓGICA PARA ENCONTRAR LA CONVERSACIÓN ---
+    if str(psicologo_user_id) == '0':
+        # Caso Soporte: Buscamos conversación donde esté el usuario y un Admin (Tipo 3)
+        relacion_comun = ConvUsuario.objects.filter(
+            usuario=request.user,
+            conversacion__convusuario__usuario__tipoUsuario_id=3
+        ).first()
+    else:
+        # Caso Normal: Buscamos conversación entre paciente y psicólogo específico
+        mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+        relacion_comun = ConvUsuario.objects.filter(
+            conversacion_id__in=mis_convs, 
+            usuario_id=psicologo_user_id
+        ).first()
+
+    if not relacion_comun:
+        return JsonResponse([], safe=False)
+
+    # --- OBTENER MENSAJES ---
+    mensajes_queryset = Mensaje.objects.filter(
+        conversacion=relacion_comun.conversacion
+    ).order_by('fechaEnvio')
+
+    # Marcar como leídos
+    Mensaje.objects.filter(
+        conversacion=relacion_comun.conversacion,
+        leido=False
+    ).exclude(usuario=request.user).update(leido=True)
+    
+    data = []
+    for m in mensajes_queryset:
+        # Convertimos a hora local del servidor/usuario
+        fecha_local = timezone.localtime(m.fechaEnvio)
+        
+        data.append({
+            'texto': m.contenido,
+            'tipo': 'sent' if m.usuario == request.user else 'received',
+            'hora': fecha_local.strftime('%I:%M %p'),
+            'fecha_completa': fecha_local.strftime('%Y-%m-%d'), # Para la lógica de Flutter
+            'dia_str': fecha_local.strftime('%d de %B, %Y'),    # Lo que se ve en el divisor
+            'leido': m.leido
+        })
+        
+    return JsonResponse(data, safe=False)
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+@csrf_exempt
+def api_enviar_mensaje_paciente(request):
+    # En DRF usamos request.data para leer JSON enviado desde Flutter
+    receptor_id = request.data.get('receptor_id')
+    contenido = request.data.get('contenido')
+
+    if not receptor_id or not contenido:
+        return JsonResponse({'error': 'Datos incompletos'}, status=400)
+
+    # --- LÓGICA DE SOPORTE (ID 0) ---
+    if str(receptor_id) == '0':
+        # Buscamos si ya existe una conversación de soporte para este paciente
+        # (Una donde estén el paciente y al menos un admin)
+        tipo_admin = TipoUsuario.objects.get(nombre='Administrador')
+        admins = Usuario.objects.filter(tipoUsuario=tipo_admin)
+        
+        # Buscamos conversación de soporte existente
+        mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+        # Filtramos conversaciones donde también esté el primer admin (como representante del grupo)
+        relacion = ConvUsuario.objects.filter(conversacion_id__in=mis_convs, usuario__tipoUsuario=tipo_admin).first()
+        
+        if relacion:
+            conversacion_obj = relacion.conversacion
+        else:
+            # Crear nueva conversación de soporte e incluir a TODOS los admins
+            conversacion_obj = Conversacion.objects.create(fechaInicio=timezone.now())
+            ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=request.user)
+            for admin in admins:
+                ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=admin)
+    else:
+        # --- LÓGICA NORMAL (PSICÓLOGO) ---
+        mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+        relacion = ConvUsuario.objects.filter(conversacion_id__in=mis_convs, usuario_id=receptor_id).first()
+
+        if relacion:
+            conversacion_obj = relacion.conversacion
+        else:
+            conversacion_obj = Conversacion.objects.create(fechaInicio=timezone.now())
+            ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=request.user)
+            receptor_user = get_object_or_404(Usuario, numero=receptor_id)
+            ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=receptor_user)
+
+    # Crear el mensaje
+    nuevo_msg = Mensaje.objects.create(
+        contenido=contenido,
+        fechaEnvio=timezone.now(),
+        conversacion=conversacion_obj,
+        usuario=request.user
+    )
+
+    return JsonResponse({
+        'status': 'ok',
+        'hora': timezone.localtime(nuevo_msg.fechaEnvio).strftime('%I:%M %p')
+    })
+
+@api_view(['GET'])
+def api_obtener_chats_admin(request):
+    # Obtiene todas las conversaciones donde el admin actual está
+    convs_ids = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+    
+    # Buscamos el otro integrante (el paciente) para mostrar su nombre
+    chats = []
+    for c_id in convs_ids:
+        # Buscamos al usuario que NO es admin en esa conv
+        participante = ConvUsuario.objects.filter(conversacion_id=c_id).exclude(usuario__tipoUsuario__nombre='Administrador').first()
+        if participante:
+            ultimo_msg = Mensaje.objects.filter(conversacion_id=c_id).last()
+            chats.append({
+                'id_paciente': participante.usuario.numero,
+                'nombre_paciente': participante.usuario.nombrePila,
+                'ultimo_msg': ultimo_msg.contenido if ultimo_msg else ""
+            })
+    return JsonResponse(chats, safe=False)

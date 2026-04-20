@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from datetime import date, datetime as dt
-from ..models import Paciente, Telefono, Psicologo, Cita, Usuario, Mensaje, Expediente, Evolucion, Antecedentes
+from ..models import Paciente, Telefono, Psicologo, Cita, ConvUsuario, Mensaje, Expediente, Evolucion, Antecedentes
 from django.db.models import Q
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -137,47 +137,48 @@ def get_agenda_diaria(request):
 
     return JsonResponse(data, safe=False)
 
-#Pantalla perfil
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_perfil_psicologo(request):
     usuario = request.user
     psicologo = get_object_or_404(Psicologo, usuario=usuario)
-    # Intentamos obtener el teléfono si existe
     telefono = Telefono.objects.filter(usuario=usuario).first()
     
     return JsonResponse({
-        "nombre": usuario.nombrePila,          # Llave simple para el form
-        "apellido": usuario.primerApellido,    # Llave simple para el form
-        "nombre_completo": f"{usuario.nombrePila} {usuario.primerApellido}",
+        "nombre": usuario.nombrePila,
+        "apellido": usuario.primerApellido,
+        "segundo_apellido": usuario.segundoApellido,
+        "nombre_completo": f"{usuario.nombrePila} {usuario.primerApellido} {usuario.segundoApellido}",
         "email": usuario.correo,
+        "genero": usuario.genero,
         "telefono": telefono.numTel if telefono else "",
+        "cedula": psicologo.cedula,
         "especialidad": psicologo.especialidad.nombre,
+        "presentacion": psicologo.presentacion or "", # Importante
         "foto_perfil": request.build_absolute_uri(usuario.fotoPerfil.url) if usuario.fotoPerfil else None,
         "tipo_usuario": "Especialista"
     })
-    
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def actualizar_perfil_psicologo(request):
     usuario = request.user
-    data = request.data
+    psicologo = get_object_or_404(Psicologo, usuario=usuario)
     
     try:
-        # Actualizamos los datos del usuario base
-        usuario.nombrePila = data.get('nombre', usuario.nombrePila)
-        usuario.primerApellido = data.get('apellido', usuario.primerApellido)
-        usuario.correo = data.get('email', usuario.correo)
+        # 1. Actualizar Foto de Perfil si viene en la petición
+        if 'foto_perfil' in request.FILES:
+            usuario.fotoPerfil = request.FILES['foto_perfil']
+        
+        # 2. Actualizar presentación del psicólogo
+        if 'presentacion' in request.data:
+            psicologo.presentacion = request.data.get('presentacion')
+            psicologo.save()
+
+        # 3. Datos básicos del usuario (opcional si los permites editar)
+        usuario.nombrePila = request.data.get('nombre', usuario.nombrePila)
         usuario.save()
         
-        # Si envías teléfono, se actualiza en la tabla Telefono
-        nuevo_tel = data.get('telefono')
-        if nuevo_tel:
-            # Buscamos el primer teléfono o creamos uno si no existe
-            tel_obj, created = Telefono.objects.get_or_create(usuario=usuario)
-            tel_obj.numTel = nuevo_tel
-            tel_obj.save()
-
         return JsonResponse({"status": "success", "message": "Perfil actualizado"})
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
@@ -235,3 +236,82 @@ def api_obtener_expediente_lateral(request):
     except Exception as e:
         print(f"Error en api_obtener_expediente_lateral: {e}")
         return JsonResponse({'error': 'Error interno del servidor'}, status=500)
+    
+#Pantalla mensajes:
+from django.utils import timezone
+from django.http import JsonResponse
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from ..models import Cita, Mensaje, ConvUsuario, Conversacion, Usuario, TipoUsuario
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_get_contactos_psicologo(request):
+    # 1. Obtener pacientes con los que el psicólogo tiene citas
+    citas = Cita.objects.filter(psicologo__usuario=request.user).select_related('paciente__usuario')
+    
+    contactos = []
+    vistos = set()
+    
+    # Agregar Soporte siempre al inicio
+    contactos.append({
+        'id': 0,
+        'nombre': "Soporte Técnico (Admin)",
+        'ultimo_msg': "Chat de ayuda y reportes",
+        'foto': None,
+        'is_admin': True
+    })
+
+    for cita in citas:
+        pac = cita.paciente.usuario
+        if pac.numero not in vistos:
+            contactos.append({
+                'id': pac.numero,
+                'nombre': f"{pac.nombrePila} {pac.primerApellido}",
+                'ultimo_msg': "Toca para ver el historial",
+                'foto': request.build_absolute_uri(pac.fotoPerfil.url) if pac.fotoPerfil else None,
+                'is_admin': False
+            })
+            vistos.add(pac.numero)
+            
+    return JsonResponse(contactos, safe=False)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_obtener_mensajes_psicologo(request):
+    receptor_id = request.GET.get('receptor_id')
+    
+    if str(receptor_id) == '0':
+        # Conversación con Admin (Tipo 3)
+        relacion_comun = ConvUsuario.objects.filter(
+            usuario=request.user,
+            conversacion__convusuario__usuario__tipoUsuario_id=3
+        ).first()
+    else:
+        # Conversación con Paciente
+        mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+        relacion_comun = ConvUsuario.objects.filter(
+            conversacion_id__in=mis_convs, 
+            usuario_id=receptor_id
+        ).first()
+
+    if not relacion_comun:
+        return JsonResponse([], safe=False)
+
+    mensajes = Mensaje.objects.filter(conversacion=relacion_comun.conversacion).order_by('fechaEnvio')
+    
+    # Marcar como leídos los que no son míos
+    Mensaje.objects.filter(conversacion=relacion_comun.conversacion, leido=False).exclude(usuario=request.user).update(leido=True)
+
+    data = []
+    for m in mensajes:
+        f_local = timezone.localtime(m.fechaEnvio)
+        data.append({
+            'texto': m.contenido,
+            'tipo': 'sent' if m.usuario == request.user else 'received',
+            'hora': f_local.strftime('%I:%M %p'),
+            'fecha_completa': f_local.strftime('%Y-%m-%d'),
+            'dia_str': f_local.strftime('%d de %B, %Y'),
+            'leido': m.leido
+        })
+    return JsonResponse(data, safe=False)
