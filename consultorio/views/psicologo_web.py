@@ -96,6 +96,18 @@ def api_detalle_paciente(request, paciente_id):
         # Citas para el historial
         citas = Cita.objects.filter(paciente=paciente).order_by('-fecha')
         
+        historial_data = []
+        for c in citas:
+            consulta = Consulta.objects.filter(cita=c).first()
+            historial_data.append({
+                "fecha": c.fecha.strftime('%d/%m/%Y'),
+                "hora": c.hora.strftime('%I:%M %p'),
+                "estado": c.estado.nombre if c.estado else "Pendiente",
+                "id_cita": c.numero,
+                "tiene_consulta": True if consulta else False,
+                "id_consulta": consulta.numero if consulta else None
+            })
+        
         data = {
             "id_expediente": expediente.numero if expediente else None,
             "nombre": f"{paciente.usuario.nombrePila} {paciente.usuario.primerApellido}",
@@ -104,30 +116,57 @@ def api_detalle_paciente(request, paciente_id):
             "estado_civil": expediente.estado_civil if expediente else "No registrado",
             "fecha_nacimiento": paciente.fechaNacimiento.strftime('%d/%m/%Y'),
             "fecha_creacion": expediente.fechaCreacion.strftime('%d/%m/%Y') if expediente else "N/A",
-            
             "antecedentes": {
                 "traumas": expediente.traumas if expediente else "",
                 "personales": antecedentes.personales if antecedentes else "",
                 "psicologicos": antecedentes.psicologicos if antecedentes else "",
                 "familiares": antecedentes.familiares if antecedentes else ""
             },
-            
-            # NUEVO: Lista de evoluciones
             "evoluciones": [{
                 "fecha": ev.fecha.strftime('%d/%m/%Y'),
                 "notas": ev.notas
             } for ev in evoluciones],
-
-            "historial": [{
-                "fecha": c.fecha.strftime('%d/%m/%Y'),
-                "hora": c.hora.strftime('%I:%M %p'),
-                "estado": c.estado.nombre if c.estado else "Pendiente",
-                "id_cita": c.numero
-            } for c in citas]
+            "historial": historial_data  # USAR SOLO ESTA VARIABLE
         }
         return Response(data)
     except Paciente.DoesNotExist:
         return Response({"error": "Paciente no encontrado"}, status=404)
+    
+# views.py
+@api_view(['GET'])
+def api_detalle_consulta(request, consulta_id):
+    try:
+        consulta = Consulta.objects.get(numero=consulta_id)
+        sesion = Sesion.objects.get(consulta=consulta)
+        # Opcional: obtener medicación o estado emocional si existen
+        
+        return Response({
+            "status": "success",
+            "diagnostico": sesion.diagnostico,
+            "resumen": sesion.resumen,
+            "notas": sesion.notas,
+            "conducta": sesion.conducta,
+            "observaciones": sesion.observaciones
+        })
+    except (Consulta.DoesNotExist, Sesion.DoesNotExist):
+        return Response({"error": "No se encontró el detalle de la sesión"}, status=404)
+    
+
+@api_view(['GET'])
+def api_info_cita(request, cita_id):
+    try:
+        cita = Cita.objects.get(numero=cita_id)
+        return Response({
+            "motivo": cita.motivo,
+            "servicio": cita.servicio.nombre, # Asumiendo que Servicio tiene campo 'nombre'
+            "modalidad": cita.modalidad.nombre,
+            "psicologo": f"{cita.psicologo.usuario.nombrePila} {cita.psicologo.usuario.primerApellido}",
+            "fecha": cita.fecha.strftime('%d/%m/%Y'),
+            "hora": cita.hora.strftime('%I:%M %p')
+        })
+    except Cita.DoesNotExist:
+        return Response({"error": "Cita no encontrada"}, status=404)
+
     
 @api_view(['POST'])
 def api_guardar_evolucion(request):
@@ -521,3 +560,33 @@ def guardar_consulta(request):
             return JsonResponse({'status': 'error', 'message': str(e)})
 
     return JsonResponse({'status': 'error', 'message': 'Método no permitido.'})
+
+
+@api_view(['POST', 'PUT'])
+def api_editar_paciente(request, paciente_id):
+    try:
+        # Buscamos al paciente por el número de usuario
+        paciente = Paciente.objects.get(usuario__numero=paciente_id)
+        expediente = Expediente.objects.filter(paciente=paciente).first()
+        antecedentes = Antecedentes.objects.filter(expediente=expediente).first()
+
+        with transaction.atomic():
+            # Actualizar Expediente (Traumas y Riesgos)
+            if expediente:
+                expediente.traumas = request.data.get('traumas', expediente.traumas)
+                expediente.riesgos = request.data.get('riesgos', expediente.riesgos)
+                expediente.save()
+
+            # Actualizar Antecedentes
+            if antecedentes:
+                antecedentes.personales = request.data.get('ant_personales', antecedentes.personales)
+                antecedentes.psicologicos = request.data.get('ant_psicologicos', antecedentes.psicologicos)
+                antecedentes.familiares = request.data.get('ant_familiares', antecedentes.familiares)
+                antecedentes.save()
+
+        return Response({
+            "status": "success", 
+            "nombre_completo": f"{paciente.usuario.nombrePila} {paciente.usuario.primerApellido}"
+        })
+    except Exception as e:
+        return Response({"status": "error", "error": str(e)}, status=400)

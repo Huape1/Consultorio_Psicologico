@@ -46,6 +46,10 @@ urlpatterns = [
     path('guardar-consulta/', psicologo_web.guardar_consulta, name='guardar_consulta'),
     path('api/detalle-paciente/<int:paciente_id>/', psicologo_web.api_detalle_paciente, name='api_detalle_paciente'),
     path('api/guardar-evolucion/', psicologo_web.api_guardar_evolucion, name='api_guardar_evolucion'),
+    path('api/pacientes/editar/<int:paciente_id>/', psicologo_web.api_editar_paciente, name='api_editar_paciente'),
+    # urls.py
+    path('api/detalle-consulta/<int:consulta_id>/', psicologo_web.api_detalle_consulta, name='api_detalle_consulta'),
+    path('api/info-cita/<int:cita_id>/', psicologo_web.api_info_cita, name='api_info_cita'),
     # |||| --- F L U T E R --- |||
     # Auth
     path('api/login/', auth_movil.api_login), 

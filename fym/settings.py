@@ -28,7 +28,7 @@ SECRET_KEY = 'django-insecure-i4ktffqx5f*$!l!-38g&7os2$!hwtvpfnsaqzfe#a)hqwv)+by
 DEBUG = True
 
 # Permite que el emulador y tu PC local entren
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.100.4']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '172.18.2.72']
 
 # Application definition
 

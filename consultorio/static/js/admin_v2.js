@@ -27,7 +27,7 @@ const actividades = [
     {
         tipo: "psicologo",
         titulo: "Nuevo psicólogo registrado",
-        descripcion: "Dr. Roberto Gómez asignado a Terapia Familiar.",
+        descripcion: "Psicól. Roberto Gómez asignado a Terapia Familiar.",
         tiempo: "Hoy, 09:30 AM",
         icono: true
     },

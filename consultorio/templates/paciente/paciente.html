@@ -111,7 +111,7 @@
                             </div>
                             <div>
                                 <label>Psicólogo</label>
-                                <p>Dr. {{ proxima_cita.psicologo.usuario.nombrePila }}</p>
+                                <p>Psicól. {{ proxima_cita.psicologo.usuario.nombrePila }}</p>
                             </div>
                         </div>
                         <button class="btn-primary" onclick="showSection('agendar')">Agendar Cita</button>
@@ -166,7 +166,7 @@
                             </div>
                             <div class="msg-preview-content">
                                 <div class="msg-preview-top">
-                                    <strong>Dr. {{ msg.usuario.nombrePila }}</strong>
+                                    <strong>Psicól. {{ msg.usuario.nombrePila }}</strong>
                                     <small>{{ msg.fechaEnvio|time:"g:i A" }}</small>
                                 </div>
                                 <p class="msg-text-truncate">{{ msg.contenido|truncatechars:35 }}</p>
@@ -290,7 +290,7 @@
                             
                             <div class="chat-info">
                                 <div class="chat-info-top">
-                                    <span class="chat-name">Dr. {{ psi.usuario.nombrePila }}</span>
+                                    <span class="chat-name">Psicól. {{ psi.usuario.nombrePila }}</span>
                                     <span class="chat-time">{{ psi.ultima_hora|time:"g:i A" }}</span>
                                 </div>
                                 <div class="chat-last-msg">
@@ -371,7 +371,7 @@
                                 <div class="user-info-table">
                                     <img src="{{ cita.psicologo.usuario.fotoPerfil.url }}" class="avatar-table">
                                     <div>
-                                        <span>Dr. {{ cita.psicologo.usuario.nombrePila }}</span><br>
+                                        <span>Psicól. {{ cita.psicologo.usuario.nombrePila }}</span><br>
                                         <small>{{ cita.psicologo.especialidad|default:"Psicólogo Clínico" }}</small>
                                     </div>
                                 </div>

@@ -11,7 +11,7 @@ async function seleccionarChatPsicologo(id, nombreCompleto, event) {
         item.classList.remove('unread');
     }
 
-    document.getElementById('chat-header').innerHTML = ` Dr. ${nombreCompleto}`;
+    document.getElementById('chat-header').innerHTML = ` Psicól. ${nombreCompleto}`;
     document.getElementById('receptor_id').value = id;
     document.getElementById('form-chat-paciente').style.display = 'block';
 
@@ -372,8 +372,8 @@ function fetchPsicologosDisponibles() {
                 <label class="psi-card-option">
                     <input type="radio" name="psicologo_id" value="${psi.id}" required onclick="activarPaso5()">
                     <div class="psi-info">
-                        <img src="${psi.foto}" alt="Dr. ${psi.nombre}">
-                        <span>Dr. ${psi.nombre}</span>
+                        <img src="${psi.foto}" alt="Psicól. ${psi.nombre}">
+                        <span>Psicól. ${psi.nombre}</span>
                     </div>
                 </label>`;
             });

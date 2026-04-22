@@ -235,16 +235,43 @@ async function verExpediente(pacienteId) {
         document.getElementById('expediente-detalle').style.display = 'block';
 
         // 4. Llenamos la tabla
+        // ... dentro de verExpediente(pacienteId) en la parte de la tabla ...
         const tabla = document.getElementById('tabla-historial');
-        if(tabla) {
-            tabla.innerHTML = data.historial.map(h => `
-                <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 10px 0;">${h.fecha}</td>
-                    <td>${h.hora}</td>
-                    <td><span class="badge">${h.estado}</span></td>
-                    <td><button onclick="alert('Cita ID: ${h.id_cita}')">Ver</button></td>
-                </tr>
-            `).join('');
+        if (tabla) {
+            tabla.innerHTML = data.historial.map(h => {
+                const btnBase = "padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-right: 5px; color: white; display: inline-flex; align-items: center; gap: 4px; transition: 0.3s;";
+
+                // 1. Botón VER CITA (Siempre activo)
+                let botones = `
+            <button style="${btnBase} background-color: #00bcd4;" onclick="verInfoCita(${h.id_cita})">
+                <i class="fas fa-calendar"></i> Ver Cita
+            </button>
+        `;
+
+                // 2. Botón VER CONSULTA (Color según existencia)
+                if (h.tiene_consulta) {
+                    botones += `
+                <button style="${btnBase} background-color: #4caf50;" onclick="verDetalleConsulta(${h.id_consulta})">
+                    <i class="fas fa-notes-medical"></i> Ver Consulta
+                </button>
+            `;
+                } else {
+                    botones += `
+                <button style="${btnBase} background-color: #bdc3c7; cursor: not-allowed;" disabled>
+                    <i class="fas fa-lock"></i> Ver Consulta
+                </button>
+            `;
+                }
+
+                return `
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 12px 8px;">${h.fecha}</td>
+                <td>${h.hora}</td>
+                <td><span class="badge badge-${h.estado.toLowerCase()}">${h.estado}</span></td>
+                <td><div style="display: flex;">${botones}</div></td>
+            </tr>
+        `;
+            }).join('');
         }
 
         // 4. CAMBIO DE PANTALLA
@@ -253,6 +280,51 @@ async function verExpediente(pacienteId) {
 
     } catch (error) {
         console.error("Error crítico al cargar expediente:", error);
+    }
+}
+
+async function verDetalleConsulta(consultaId) {
+    try {
+        const response = await fetch(`/api/detalle-consulta/${consultaId}/`);
+        if (!response.ok) throw new Error("Error en la respuesta");
+
+        const data = await response.json();
+
+        // Llenar datos en el modal
+        document.getElementById('det-diagnostico').innerText = data.diagnostico || "No registrado";
+        document.getElementById('det-resumen').innerText = data.resumen || "No registrado";
+        document.getElementById('det-conducta').innerText = data.conducta || "No registrado";
+        document.getElementById('det-notas').innerText = data.notas || "Sin notas adicionales";
+
+        // Mostrar el modal
+        document.getElementById('modal-detalle-consulta').style.display = 'flex';
+
+    } catch (error) {
+        console.error("Error al obtener detalle:", error);
+        alert("No se pudo cargar el detalle de la consulta. Verifica que la URL esté bien configurada.");
+    }
+}
+
+async function verInfoCita(citaId) {
+    console.log("Cargando información de cita:", citaId);
+    try {
+        const response = await fetch(`/api/info-cita/${citaId}/`);
+        if (!response.ok) throw new Error("No se pudo obtener la información");
+
+        const data = await response.json();
+
+        // Llenar el modal de la cita
+        document.getElementById('cita-servicio').innerText = data.servicio;
+        document.getElementById('cita-modalidad').innerText = data.modalidad;
+        document.getElementById('cita-psicologo').innerText = data.psicologo;
+        document.getElementById('cita-motivo').innerText = data.motivo || "No especificado";
+
+        // Mostrar el modal
+        document.getElementById('modal-info-cita').style.display = 'flex';
+
+    } catch (error) {
+        console.error("Error:", error);
+        alert("Error al cargar los datos de la cita.");
     }
 }
 
@@ -887,3 +959,171 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+
+function abrirEdicionAntecedentes(pacienteId) {
+    if (!pacienteId || pacienteId === "undefined") {
+        alert("ID de paciente no válido.");
+        return;
+    }
+
+    fetch(`/api/detalle-paciente/${pacienteId}/`)
+        .then(response => response.json())
+        .then(data => {
+            // Llenar los campos del modal con lo que viene de la base de datos
+            document.getElementById('edit_paciente_id').value = pacienteId;
+            document.getElementById('edit_traumas').value = data.antecedentes.traumas || "";
+            document.getElementById('edit_ant_personales').value = data.antecedentes.personales || "";
+            document.getElementById('edit_ant_psicologicos').value = data.antecedentes.psicologicos || "";
+            document.getElementById('edit_ant_familiares').value = data.antecedentes.familiares || "";
+
+            // Mostrar modal
+            document.getElementById('modal-editar-ante').style.display = 'flex';
+        })
+        .catch(err => console.error("Error cargando paciente:", err));
+}
+
+function cerrarEdicionAntecedentes() {
+    document.getElementById('modal-editar-ante').style.display = 'none';
+}
+
+// 3. Manejar el envío del formulario
+document.getElementById('form-editar-ante').addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const pacienteId = document.getElementById('edit_paciente_id').value;
+    const formData = new FormData();
+
+    formData.append('traumas', document.getElementById('edit_traumas').value);
+    formData.append('ant_personales', document.getElementById('edit_ant_personales').value);
+    formData.append('ant_psicologicos', document.getElementById('edit_ant_psicologicos').value);
+    formData.append('ant_familiares', document.getElementById('edit_ant_familiares').value);
+
+    fetch(`/api/pacientes/editar/${pacienteId}/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert("Información actualizada con éxito.");
+                location.reload();
+            } else {
+                alert("Error: " + data.error);
+            }
+        })
+        .catch(err => alert("Error en la conexión con el servidor."));
+});
+
+function guardarCambiosPaciente() {
+    const pacienteId = document.getElementById('edit_paciente_id').value;
+
+    // Verificamos que tengamos un ID válido antes de continuar
+    if (!pacienteId) {
+        console.error("No se encontró el ID del paciente para editar.");
+        return;
+    }
+
+    const formData = new FormData();
+
+    // --- DATOS PERSONALES (Usuario/Paciente) ---
+    formData.append('nombrePila', document.getElementById('edit_nombre_pila').value);
+    formData.append('primerApellido', document.getElementById('edit_primer_apellido').value);
+    formData.append('correo', document.getElementById('edit_correo').value);
+    formData.append('genero', document.getElementById('edit_genero').value);
+    formData.append('fecha_nacimiento', document.getElementById('edit_fecha_nac').value);
+
+    // Si tienes un input de tipo file para la foto:
+    const fotoInput = document.getElementById('edit_foto_perfil');
+    if (fotoInput && fotoInput.files[0]) {
+        formData.append('fotoPerfil', fotoInput.files[0]);
+    }
+
+    // --- DATOS CLÍNICOS (Expediente) ---
+    formData.append('ocupacion', document.getElementById('edit_ocupacion').value);
+    formData.append('estado_civil', document.getElementById('edit_estado_civil').value);
+    formData.append('traumas', document.getElementById('edit_traumas').value);
+    formData.append('riesgos', document.getElementById('edit_riesgos').value);
+
+    // --- ANTECEDENTES ---
+    formData.append('ant_personales', document.getElementById('edit_ant_personales').value);
+    formData.append('ant_psicologicos', document.getElementById('edit_ant_psicologicos').value);
+    formData.append('ant_familiares', document.getElementById('edit_ant_familiares').value);
+
+    // Ejecutar petición
+    fetch(`/api/pacientes/editar/${pacienteId}/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+        .then(response => {
+            if (!response.ok) {
+                // Manejo de errores de red o servidor (404, 500, etc)
+                return response.json().then(err => { throw err; });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                // Usar una notificación más limpia si tienes una disponible
+                alert("¡Éxito! Los datos de " + data.nombre_completo + " han sido actualizados.");
+                location.reload();
+            } else {
+                alert("Error al guardar: " + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error en la petición:', error);
+            alert("Ocurrió un error inesperado al intentar guardar los cambios.");
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const inputPaciente = document.getElementById('filter-paciente');
+    const inputFecha = document.getElementById('filter-fecha');
+    const pills = document.querySelectorAll('#estado-filters .btn-pill');
+    const filas = document.querySelectorAll('.custom-table tbody tr');
+
+    function filtrarTabla() {
+        const busquedaPaciente = inputPaciente.value.toLowerCase();
+        const busquedaFecha = inputFecha.value.toLowerCase();
+
+        // Obtener el estado activo de las pills
+        const pillActiva = document.querySelector('#estado-filters .btn-pill.active');
+        const estadoFiltro = pillActiva.getAttribute('data-status').toLowerCase();
+
+        filas.forEach(fila => {
+            const nombrePaciente = fila.querySelector('.p-name').innerText.toLowerCase();
+            const fechaCita = fila.querySelector('td:first-child').innerText.toLowerCase();
+            const estadoCita = fila.querySelector('.status-badge').innerText.toLowerCase();
+
+            const coincidePaciente = nombrePaciente.includes(busquedaPaciente);
+            const coincideFecha = fechaCita.includes(busquedaFecha);
+            const coincideEstado = (estadoFiltro === 'todas' || estadoCita === estadoFiltro);
+
+            if (coincidePaciente && coincideFecha && coincideEstado) {
+                fila.style.display = "";
+            } else {
+                fila.style.display = "none";
+            }
+        });
+    }
+
+    // Eventos para inputs
+    inputPaciente.addEventListener('input', filtrarTabla);
+    inputFecha.addEventListener('input', filtrarTabla);
+
+    // Eventos para las pills (botones de estado)
+    pills.forEach(pill => {
+        pill.addEventListener('click', function () {
+            pills.forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+            filtrarTabla();
+        });
+    });
+});
