@@ -993,3 +993,13 @@ button:hover {
     cursor: pointer;
     text-align: center;
 }
+
+
+.soporte-item:hover {
+    filter: brightness(0.95);
+    cursor: pointer;
+}
+
+.soporte-item .chat-avatar svg {
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.2));
+}

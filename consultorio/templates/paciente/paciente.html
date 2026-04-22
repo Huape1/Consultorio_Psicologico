@@ -95,7 +95,13 @@
                 
                 <div class="card main-appointment-card">
                     <div class="card-header">
-                        <span class="badge-status">Confirmada</span>
+                        {% if proxima_cita %}
+                            {% if proxima_cita.fecha == today_date %}
+                                <span class="badge-status" style="background: #e63946; color: white;">¡Hoy!</span>
+                            {% else %}
+                                <span class="badge-status">Confirmada</span>
+                            {% endif %}
+                        {% endif %}
                         <h3>Próxima cita</h3>
                     </div>
                     {% if proxima_cita %}
@@ -280,6 +286,23 @@
                     </div>
                     
                     <ul id="lista-psicologos-chat">
+                        <li class="chat-item soporte-item" 
+                            onclick="seleccionarChatPsicologo('SOPORTE', 'Soporte Técnico', event)"
+                            style="background: linear-gradient(135deg, #f0faff 0%, #def7fe 100%); border-bottom: 1px solid #0fa3b122;">
+                            <div class="chat-avatar" style="background: #0fa3b1; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="35" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg>
+                            </div>
+                            <div class="chat-info">
+                                <div class="chat-info-top">
+                                    <span class="chat-name" style="color: #264653; font-weight: bold;">Soporte Técnico</span>
+                                </div>
+                                <div class="chat-last-msg">
+                                    <span class="msg-content" style="color: #0fa3b1;">Ayuda con la plataforma</span>
+                                </div>
+                            </div>
+                        </li>
+
+                        <hr style="border: 0; height: 1px; background: #eee; margin: 5px 15px;">
                         {% for psi in mis_psicologos %}
                         <li class="chat-item {% if psi.sin_leer %}unread{% endif %}" 
                             onclick="seleccionarChatPsicologo('{{ psi.usuario.numero }}', '{{ psi.usuario.nombrePila }}', event)">

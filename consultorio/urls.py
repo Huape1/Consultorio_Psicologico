@@ -38,6 +38,7 @@ urlpatterns = [
     path('esp/', admin_web.esp), # Talvez la elimine
     # --- PANEL PSICÓLOGO ---
     path('obtener-mensajes-psicologo/', psicologo_web.obtener_mensajes_psicologo, name='obtener_mensajes_psicologo'),
+    path('enviar-mensaje-psicologo/', psicologo_web.enviar_mensaje_psicologo, name='enviar_mensaje_psicologo'),
     path('api/pacientes-detallada/', psicologo_web.api_lista_pacientes_detallada, name='api_pacientes_detallada'),
     path('guardar_consulta/', psicologo_web.guardar_consulta, name='guardar_consulta'),
     path('panel_psicologos/', psicologo_web.panel_psicologos, name='panel_psicologos'), #Puede que lo elimine
@@ -47,6 +48,10 @@ urlpatterns = [
     path('api/detalle-paciente/<int:paciente_id>/', psicologo_web.api_detalle_paciente, name='api_detalle_paciente'),
     path('api/guardar-evolucion/', psicologo_web.api_guardar_evolucion, name='api_guardar_evolucion'),
     path('api/pacientes/editar/<int:paciente_id>/', psicologo_web.api_editar_paciente, name='api_editar_paciente'),
+    path('api/editar-datos-expediente/', psicologo_web.editar_datos_expediente, name='api_editar_datos_expediente'),
+    path('perfil/actualizar/', psicologo_web.actualizar_perfil, name='actualizar_perfil'),
+    # Busca esta línea en tu archivo urls.py
+path('api/editar-paciente/<int:paciente_id>/', psicologo_web.api_editar_paciente, name='api_editar_paciente'),
     # urls.py
     path('api/detalle-consulta/<int:consulta_id>/', psicologo_web.api_detalle_consulta, name='api_detalle_consulta'),
     path('api/info-cita/<int:cita_id>/', psicologo_web.api_info_cita, name='api_info_cita'),

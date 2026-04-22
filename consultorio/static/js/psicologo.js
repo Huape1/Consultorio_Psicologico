@@ -1,4 +1,6 @@
 window.verExpediente = verExpediente;
+// Al inicio del archivo
+let currentPacienteId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Asegúrate de que el nombre sea igual al de la función de abajo
@@ -131,6 +133,20 @@ document.getElementById('form-chat-psicologo').onsubmit = async (e) => {
     }
 };
 
+function seleccionarChatSoporte(event) {
+    pacienteSeleccionadoId = 'SOPORTE'; // ID especial que Django entenderá
+    
+    // UI: Quitar activo de pacientes y ponerlo en soporte
+    document.querySelectorAll('#lista-pacientes-chat li').forEach(li => li.classList.remove('active'));
+    document.querySelectorAll('.soporte-chat-item').forEach(div => div.classList.add('active'));
+
+    document.getElementById('chat-header-name').innerText = "Soporte Técnico (Administradores)";
+    document.getElementById('receptor_paciente_id').value = 'SOPORTE';
+    document.getElementById('form-chat-psicologo').style.display = 'flex';
+
+    actualizarMensajesPsicologo();
+}
+
 // BUSCADOR
 function filtrarPacientes() {
     const busqueda = document.getElementById('buscarPaciente').value.toLowerCase();
@@ -191,6 +207,7 @@ async function cargarPacientesCards() {
 
 async function verExpediente(pacienteId) {
     console.log("Cargando paciente ID:", pacienteId);
+    currentPacienteId = pacienteId;
     
     try {
         const response = await fetch(`/api/detalle-paciente/${pacienteId}/`);
@@ -961,62 +978,82 @@ function getCookie(name) {
 }
 
 
-function abrirEdicionAntecedentes(pacienteId) {
-    if (!pacienteId || pacienteId === "undefined") {
-        alert("ID de paciente no válido.");
+function abrirEdicionAntecedentes() {
+    if (!currentPacienteId) {
+        alert("Selecciona un paciente primero");
         return;
     }
 
-    fetch(`/api/detalle-paciente/${pacienteId}/`)
-        .then(response => response.json())
-        .then(data => {
-            // Llenar los campos del modal con lo que viene de la base de datos
-            document.getElementById('edit_paciente_id').value = pacienteId;
-            document.getElementById('edit_traumas').value = data.antecedentes.traumas || "";
-            document.getElementById('edit_ant_personales').value = data.antecedentes.personales || "";
-            document.getElementById('edit_ant_psicologicos').value = data.antecedentes.psicologicos || "";
-            document.getElementById('edit_ant_familiares').value = data.antecedentes.familiares || "";
+    // Ponemos el ID en el campo oculto
+    document.getElementById('edit_paciente_id').value = currentPacienteId;
 
-            // Mostrar modal
-            document.getElementById('modal-editar-ante').style.display = 'flex';
-        })
-        .catch(err => console.error("Error cargando paciente:", err));
+    // Extraemos el texto de la pantalla lateral y lo pasamos a los textareas del modal
+    // Asegúrate de que los IDs 'exp-traumas', etc., sean los que usas en tu barra lateral
+    document.getElementById('exp_traumas').value = document.getElementById('exp-traumas')?.innerText.trim() || "";
+    document.getElementById('exp_personales').value = document.getElementById('exp-personales')?.innerText.trim() || "";
+    document.getElementById('exp_familiares').value = document.getElementById('exp-familiares')?.innerText.trim() || "";
+    document.getElementById('exp_psicologicos').value = document.getElementById('exp-psicologicos')?.innerText.trim() || "";
+
+    // Mostramos el modal
+    document.getElementById('modal-editar-ante').style.display = 'flex';
 }
+
+// 3. Manejar el envío del formulario
+document.getElementById('form-editar-ante').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const pId = document.getElementById('edit_paciente_id').value;
+    
+    // Recolectamos lo que escribió el usuario en el modal
+    const datosNuevos = {
+        traumas: document.getElementById('exp_traumas').value,
+        personales: document.getElementById('exp_personales').value,
+        familiares: document.getElementById('exp_familiares').value,
+        psicologicos: document.getElementById('exp_psicologicos').value
+    };
+
+    const formData = new FormData();
+    formData.append('traumas', datosNuevos.traumas);
+    formData.append('ant_personales', datosNuevos.personales);
+    formData.append('ant_familiares', datosNuevos.familiares);
+    formData.append('ant_psicologicos', datosNuevos.psicologicos);
+
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    try {
+        const response = await fetch(`/api/editar-paciente/${pId}/`, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': csrftoken }
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.status === 'success') {
+            // ACTUALIZACIÓN DE LA PANTALLA LATERAL (Donde el psicólogo lee)
+            // IMPORTANTE: Estos IDs deben existir en tu panel derecho
+            if(document.getElementById('exp-traumas')) 
+                document.getElementById('exp-traumas').innerText = datosNuevos.traumas;
+            if(document.getElementById('exp-personales')) 
+                document.getElementById('exp-personales').innerText = datosNuevos.personales;
+            if(document.getElementById('exp-familiares')) 
+                document.getElementById('exp-familiares').innerText = datosNuevos.familiares;
+            if(document.getElementById('exp-psicologicos')) 
+                document.getElementById('exp-psicologicos').innerText = datosNuevos.psicologicos;
+
+            cerrarEdicionAntecedentes();
+            alert("¡Todo actualizado!");
+        } else {
+            alert("Error: " + (data.error || "No se pudo actualizar"));
+        }
+    } catch (error) {
+        console.error("Error:", error);
+    }
+});
 
 function cerrarEdicionAntecedentes() {
     document.getElementById('modal-editar-ante').style.display = 'none';
 }
-
-// 3. Manejar el envío del formulario
-document.getElementById('form-editar-ante').addEventListener('submit', function (e) {
-    e.preventDefault();
-
-    const pacienteId = document.getElementById('edit_paciente_id').value;
-    const formData = new FormData();
-
-    formData.append('traumas', document.getElementById('edit_traumas').value);
-    formData.append('ant_personales', document.getElementById('edit_ant_personales').value);
-    formData.append('ant_psicologicos', document.getElementById('edit_ant_psicologicos').value);
-    formData.append('ant_familiares', document.getElementById('edit_ant_familiares').value);
-
-    fetch(`/api/pacientes/editar/${pacienteId}/`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken')
-        }
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert("Información actualizada con éxito.");
-                location.reload();
-            } else {
-                alert("Error: " + data.error);
-            }
-        })
-        .catch(err => alert("Error en la conexión con el servidor."));
-});
 
 function guardarCambiosPaciente() {
     const pacienteId = document.getElementById('edit_paciente_id').value;
@@ -1127,3 +1164,148 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 });
+
+
+
+
+function abrirModalEditarDatos() {
+    if (!currentPacienteId) {
+        console.error("No hay un ID de paciente seleccionado");
+        return;
+    }
+
+    const ocupacionActual = document.getElementById('exp-ocupacion').innerText;
+    const civilActual = document.getElementById('exp-civil').innerText;
+    
+    document.getElementById('edit-paciente-id').value = currentPacienteId;
+    document.getElementById('edit-ocupacion').value = ocupacionActual;
+    document.getElementById('edit-estado-civil').value = civilActual;
+    
+
+    document.getElementById('modal-editar-datos').style.display = 'flex';
+}
+
+function cerrarModalDatos() {
+    document.getElementById('modal-editar-datos').style.display = 'none';
+}
+
+// Asegúrate de tener esta variable global al inicio de tu psicologo.js
+// let currentPacienteId = null; 
+
+document.getElementById('form-editar-datos').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // 1. Recolectamos los valores de los inputs del modal
+    const pId = document.getElementById('edit-paciente-id').value;
+    const ocu = document.getElementById('edit-ocupacion').value;
+    const civ = document.getElementById('edit-estado-civil').value;
+
+    // Log para depuración en el navegador
+    console.log("Datos a enviar:", { pId, ocu, civ });
+
+    // 2. Preparamos el FormData
+    const formData = new FormData();
+    formData.append('paciente_id', pId);
+    formData.append('ocupacion', ocu);
+    formData.append('estado_civil', civ);
+
+    // 3. Obtenemos el CSRF Token (necesario para Django)
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    try {
+        // 4. Realizamos la petición al servidor
+        const response = await fetch('/api/editar-datos-expediente/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrftoken 
+            }
+        });
+
+        // 5. Procesamos la respuesta JSON
+        const data = await response.json();
+        console.log("Respuesta completa del servidor:", data);
+
+        if (response.ok && data.status === 'success') {
+            // ÉXITO: Actualizamos la UI sin recargar
+            document.getElementById('exp-ocupacion').innerText = ocu;
+            document.getElementById('exp-civil').innerText = civ;
+            
+            // Cerramos el modal (asumiendo que tienes esta función)
+            cerrarModalEditarDatos(); 
+            
+            alert("¡Datos actualizados correctamente!");
+        } else {
+            // ERROR: Mostramos el mensaje que viene de Django
+            console.error("Error del servidor:", data.message);
+            alert("Error: " + (data.message || "No se pudo actualizar el expediente"));
+        }
+
+    } catch (error) {
+        // ERROR DE RED: No se pudo llegar al servidor
+        console.error("Error de conexión:", error);
+        alert("Fallo de conexión con el servidor.");
+    }
+});
+
+// Función auxiliar para cerrar el modal (si no la tienes)
+function cerrarModalEditarDatos() {
+    document.getElementById('modal-editar-datos').style.display = 'none';
+}
+
+
+
+
+
+
+
+
+function enableEdit() {
+    // Quitar el readonly de todos los inputs del perfil
+    document.querySelectorAll('.profile-input').forEach(input => {
+        input.removeAttribute('readonly');
+        input.style.background = "#fff";
+        input.style.border = "1px solid #0FA3B1";
+    });
+
+    // Alternar botones
+    document.getElementById('btnEdit').style.display = 'none';
+    document.getElementById('btnSave').style.display = 'block';
+}
+
+function previewImage(input) {
+    if (input.files && input.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('profilePreview').src = e.target.result;
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function habilitarEdicion() {
+    // Desbloqueamos los inputs
+    const inputs = document.querySelectorAll('.editable-input');
+    inputs.forEach(input => {
+        input.removeAttribute('readonly');
+        input.style.backgroundColor = "white";
+        input.style.border = "1px solid #0FA3B1";
+    });
+
+    // Cambiamos los botones
+    document.getElementById('btn-editar-perfil').style.display = 'none';
+    document.getElementById('btn-guardar-perfil').style.display = 'block';
+}
+
+function previsualizarFoto(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('img-perfil-preview').src = e.target.result;
+            // Si el usuario cambia la foto, habilitamos el guardado automáticamente
+            document.getElementById('btn-editar-perfil').style.display = 'none';
+            document.getElementById('btn-guardar-perfil').style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}

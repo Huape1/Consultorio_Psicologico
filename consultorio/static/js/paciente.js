@@ -5,13 +5,13 @@ let psicologoSeleccionadoId = null;
 async function seleccionarChatPsicologo(id, nombreCompleto, event) {
     psicologoSeleccionadoId = id;
 
-    // UI: Quitar negritas visualmente al hacer clic
     const item = event.currentTarget;
-    if (item) {
-        item.classList.remove('unread');
-    }
+    if (item) item.classList.remove('unread');
 
-    document.getElementById('chat-header').innerHTML = ` Psicól. ${nombreCompleto}`;
+    // Ajuste de título dinámico
+    const prefijo = (id === 'SOPORTE') ? '' : 'Psicól. ';
+    document.getElementById('chat-header').innerHTML = `${prefijo}${nombreCompleto}`;
+    
     document.getElementById('receptor_id').value = id;
     document.getElementById('form-chat-paciente').style.display = 'block';
 

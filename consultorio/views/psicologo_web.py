@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from datetime import datetime, date
@@ -6,7 +6,7 @@ from django.db import transaction
 from datetime import timedelta
 from django.db.models.functions import ExtractMonth
 from django.db.models import Count
-from ..models import  Paciente, Telefono, Sesion, Pago,  Psicologo, Mensaje, ConvUsuario, Cita, EdoCita, Consulta, Expediente, Antecedentes, Evolucion, Medicacion, PlanTrabajo, EdoEmocional
+from ..models import  Paciente, Telefono, Sesion, Pago, Usuario, Psicologo, Mensaje, ConvUsuario, Cita, EdoCita, Consulta, Expediente, Antecedentes, Evolucion, Medicacion, PlanTrabajo, EdoEmocional, Conversacion
 from django.contrib import messages
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -23,31 +23,51 @@ User = get_user_model()
 
 @login_required
 def obtener_mensajes_psicologo(request):
-    paciente_user_id = request.GET.get('paciente_id') 
-    if not paciente_user_id:
+    receptor_id = request.GET.get('paciente_id')
+    if not receptor_id:
         return JsonResponse([], safe=False)
 
-    # 1. Buscamos la conversación que comparten el paciente y el psicólogo
-    # Primero obtenemos todas las conversaciones del paciente actual
-    mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
-    
-    # Buscamos si en alguna de esas conversaciones también está el psicólogo
-    relacion_comun = ConvUsuario.objects.filter(
-        conversacion_id__in=mis_convs, 
-        usuario_id=paciente_user_id
-    ).first()
+    conversacion_final = None
 
-    if not relacion_comun:
+    if receptor_id == 'SOPORTE':
+        # Buscamos una conversación donde esté el psicólogo y al menos un admin
+        relacion_soporte = ConvUsuario.objects.filter(
+            usuario=request.user,
+            conversacion__convusuario__usuario__is_staff=True
+        ).distinct().first()
+
+        if not relacion_soporte:
+            # Si no existe, se crea la charla grupal de soporte
+            nueva_conv = Conversacion.objects.create(fechaInicio=timezone.now())
+            ConvUsuario.objects.create(usuario=request.user, conversacion=nueva_conv)
+            
+            # Vinculamos a los administradores
+            admins = Usuario.objects.filter(is_staff=True)
+            for admin in admins:
+                ConvUsuario.objects.get_or_create(usuario=admin, conversacion=nueva_conv)
+            conversacion_final = nueva_conv
+        else:
+            conversacion_final = relacion_soporte.conversacion
+    else:
+        # Lógica para chat con pacientes
+        mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+        relacion_comun = ConvUsuario.objects.filter(
+            conversacion_id__in=mis_convs, 
+            usuario_id=receptor_id
+        ).first()
+        
+        if relacion_comun:
+            conversacion_final = relacion_comun.conversacion
+
+    if not conversacion_final:
         return JsonResponse([], safe=False)
 
-    # 2. Obtenemos los mensajes usando el campo 'conversacion' y ordenamos por 'fechaEnvio'
-    mensajes_queryset = Mensaje.objects.filter(
-        conversacion=relacion_comun.conversacion
-    ).order_by('fechaEnvio')
+    # Obtenemos los mensajes
+    mensajes_queryset = Mensaje.objects.filter(conversacion=conversacion_final).order_by('fechaEnvio')
 
-    # 3. Marcar mensajes del psicólogo como leídos
+    # Marcar como leídos los recibidos
     Mensaje.objects.filter(
-        conversacion=relacion_comun.conversacion,
+        conversacion=conversacion_final,
         leido=False
     ).exclude(usuario=request.user).update(leido=True)
     
@@ -58,12 +78,63 @@ def obtener_mensajes_psicologo(request):
             'texto': m.contenido,
             'tipo': 'sent' if m.usuario == request.user else 'received',
             'hora': hora_local.strftime('%I:%M %p'),
-            'fecha_completa': hora_local.strftime('%Y-%m-%d'), # Formato para comparar: 2026-04-15
-            'dia_str': hora_local.strftime('%d de %B, %Y'), # Formato legible
+            'fecha_completa': hora_local.strftime('%Y-%m-%d'),
+            'dia_str': hora_local.strftime('%d de %B, %Y'),
             'leido': m.leido
         })
         
     return JsonResponse(data, safe=False)
+
+@login_required
+def enviar_mensaje_psicologo(request):
+    if request.method == 'POST':
+        receptor_id = request.POST.get('usuario_id') 
+        contenido = request.POST.get('contenido')
+
+        if not contenido or not receptor_id:
+            return JsonResponse({'status': 'error', 'message': 'Faltan datos'}, status=400)
+
+        conversacion_final = None
+
+        if receptor_id == 'SOPORTE':
+            # Buscar la conversación de soporte ya existente
+            relacion = ConvUsuario.objects.filter(
+                usuario=request.user,
+                conversacion__convusuario__usuario__is_staff=True
+            ).distinct().first()
+            
+            if relacion:
+                conversacion_final = relacion.conversacion
+            else:
+                # Crear si no existe (emergencia)
+                conversacion_final = Conversacion.objects.create(fechaInicio=timezone.now())
+                ConvUsuario.objects.create(usuario=request.user, conversacion=conversacion_final)
+                for admin in Usuario.objects.filter(is_staff=True):
+                    ConvUsuario.objects.get_or_create(usuario=admin, conversacion=conversacion_final)
+        else:
+            # Buscar conversación con paciente
+            mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+            relacion = ConvUsuario.objects.filter(conversacion_id__in=mis_convs, usuario_id=receptor_id).first()
+            
+            if relacion:
+                conversacion_final = relacion.conversacion
+            else:
+                # Primer mensaje: crear conversación bilateral
+                conversacion_final = Conversacion.objects.create(fechaInicio=timezone.now())
+                ConvUsuario.objects.create(usuario=request.user, conversacion=conversacion_final)
+                ConvUsuario.objects.create(usuario_id=receptor_id, conversacion=conversacion_final)
+
+        # Crear el mensaje
+        Mensaje.objects.create(
+            contenido=contenido,
+            conversacion=conversacion_final,
+            usuario=request.user,
+            fechaEnvio=timezone.now()
+        )
+
+        return JsonResponse({'status': 'success'})
+    
+    return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
 
 @api_view(['GET'])
 def api_lista_pacientes_detallada(request):
@@ -243,12 +314,20 @@ def panel_psicologos(request):
         return redirect('/')
 
     hoy = timezone.now().date()
+    hoy2 = timezone.localtime(timezone.now()).date()
     ahora = timezone.now()
     ahora1 = timezone.localtime(timezone.now())
     hora_actual = ahora1.time()
     
     # --- ESTADÍSTICAS ---
-    citas_hoy_count = Cita.objects.filter(psicologo=psicologo, fecha=hoy).count()
+    ahora_local = timezone.localtime(timezone.now())
+    hoy_local = ahora_local.date()
+    hora_local = ahora_local.time()
+    citas_hoy_count = Cita.objects.filter(
+        psicologo=psicologo, 
+        fecha=hoy_local,
+        hora__gte=hora_local  # Solo citas cuya hora sea mayor o igual a la actual
+    ).count()
     pacientes_activos = Paciente.objects.filter(cita__psicologo=psicologo).distinct().count()
     citas_pendientess = Cita.objects.filter(
         psicologo=psicologo,
@@ -415,11 +494,9 @@ def panel_psicologos(request):
 def guardar_expediente_ajax(request):
     if request.method == 'POST':
         try:
-            # 1. Obtener al paciente (puedes pasarlo por ID desde el JS)
             paciente_id = request.POST.get('paciente_id')
             paciente = Paciente.objects.get(numero=paciente_id)
 
-            # 2. Crear el Expediente
             expediente = Expediente.objects.create(
                 fechaCreacion=timezone.now().date(),
                 traumas=request.POST.get('traumas'),
@@ -429,7 +506,6 @@ def guardar_expediente_ajax(request):
                 paciente=paciente
             )
 
-            # 3. Crear los Antecedentes vinculados al expediente
             Antecedentes.objects.create(
                 personales=request.POST.get('ant_personales'),
                 psicologicos=request.POST.get('ant_psicologicos'),
@@ -437,7 +513,13 @@ def guardar_expediente_ajax(request):
                 expediente=expediente
             )
 
-            return JsonResponse({'status': 'success', 'message': 'Expediente guardado correctamente'})
+            # --- CAMBIO AQUÍ: Enviamos el ID de vuelta ---
+            return JsonResponse({
+                'status': 'success', 
+                'message': 'Expediente guardado correctamente',
+                'paciente_id': paciente.numero  # <--- IMPORTANTE
+            })
+            
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
@@ -590,3 +672,126 @@ def api_editar_paciente(request, paciente_id):
         })
     except Exception as e:
         return Response({"status": "error", "error": str(e)}, status=400)
+    
+
+
+
+@login_required
+def editar_datos_expediente(request):
+    if request.method == 'POST':
+        try:
+            u_id = request.POST.get('paciente_id')
+            ocu = request.POST.get('ocupacion')
+            civil = request.POST.get('estado_civil')
+
+            # BUSQUEDA CLAVE: Buscar paciente donde el usuario vinculado tenga numero X
+            paciente_obj = Paciente.objects.filter(usuario__numero=u_id).first()
+
+            if not paciente_obj:
+                return JsonResponse({'status': 'error', 'message': f'No existe paciente para usuario {u_id}'}, status=400)
+
+            # Usar get_or_create para evitar errores si no existe el expediente aún
+            expediente, created = Expediente.objects.get_or_create(
+                paciente=paciente_obj,
+                defaults={'ocupacion': ocu, 'estado_civil': civil, 'fechaCreacion': timezone.now().date()}
+            )
+
+            if not created:
+                expediente.ocupacion = ocu
+                expediente.estado_civil = civil
+                expediente.save()
+
+            return JsonResponse({'status': 'success', 'message': 'Guardado correctamente'})
+
+        except Exception as e:
+            # ESTO ES VITAL: Si falla, devolvemos el error exacto en el JSON
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+            
+    return JsonResponse({'status': 'error', 'message': 'Solo POST'}, status=405)
+
+
+
+@api_view(['POST'])
+@transaction.atomic # Movemos el atomic aquí para proteger toda la función
+def api_editar_paciente(request, paciente_id):
+    try:
+        paciente = Paciente.objects.get(usuario__numero=paciente_id)
+        expediente = Expediente.objects.filter(paciente=paciente).first()
+        
+        if not expediente:
+            return Response({"status": "error", "error": "No existe expediente"}, status=404)
+
+        # Obtenemos o creamos los antecedentes de una vez
+        antecedentes, _ = Antecedentes.objects.get_or_create(expediente=expediente)
+
+        # RECOMENDACIÓN: Usa request.data.get si es @api_view
+        # Asegúrate de que los strings coincidan EXACTAMENTE con el formData.append de tu JS
+        
+        # 1. Actualizar Expediente
+        expediente.traumas = request.data.get('traumas', expediente.traumas)
+        expediente.save()
+
+        # 2. Actualizar Antecedentes
+        # Importante: verifica que en JS sea 'ant_personales', 'ant_psicologicos', etc.
+        antecedentes.personales = request.data.get('ant_personales', antecedentes.personales)
+        antecedentes.psicologicos = request.data.get('ant_psicologicos', antecedentes.psicologicos)
+        antecedentes.familiares = request.data.get('ant_familiares', antecedentes.familiares)
+        
+        antecedentes.save()
+
+        return Response({
+            "status": "success", 
+            "message": "Antecedentes actualizados correctamente"
+        })
+    except Exception as e:
+        return Response({"status": "error", "error": str(e)}, status=400)
+    
+
+# views.py
+def panel_psicologo(request):
+    psicologo_obj = get_object_or_404(Psicologo, usuario=request.user)
+    
+    # Intenta obtener el teléfono directamente relacionado al usuario
+    telefono_obj = Telefono.objects.filter(usuario=request.user).first()
+    
+    # DEBUG: Imprime en consola para ver si Django realmente encuentra algo
+    print(f"Teléfono encontrado: {telefono_obj.numTel if telefono_obj else 'Ninguno'}")
+
+    context = {
+        'psicologo': psicologo_obj,
+        'telefono': telefono_obj,
+    }
+    return render(request, 'dashboard.html', context)
+
+def actualizar_perfil(request):
+    if request.method == 'POST':
+        user = request.user
+        
+        # 1. Actualizar datos básicos de Usuario
+        user.nombrePila = request.POST.get('nombrePila')
+        user.primerApellido = request.POST.get('primerApellido')
+        user.segundoApellido = request.POST.get('segundoApellido')
+        user.genero = request.POST.get('genero')
+        
+        # Manejar la subida de foto
+        if 'fotoPerfil' in request.FILES:
+            user.fotoPerfil = request.FILES['fotoPerfil']
+            
+        user.save()
+
+        # 2. Actualizar Teléfono
+        tel_numero = request.POST.get('numTel')
+        # get_or_create por si no tenía teléfono registrado
+        telefono, created = Telefono.objects.get_or_create(usuario=user)
+        telefono.numTel = tel_numero
+        telefono.save()
+
+        # 3. Actualizar Cédula en el modelo Psicologo
+        psicologo = Psicologo.objects.get(usuario=user)
+        psicologo.cedula = request.POST.get('cedula')
+        psicologo.save()
+
+        messages.success(request, "Perfil actualizado correctamente")
+        return redirect('panel_psicologos') # O el nombre de tu vista principal
+
+    return redirect('panel_psicologos')

@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 import datetime  
 from datetime import date, timedelta
+from django.db.models import Q
 from datetime import datetime as dt
 from ..models import Usuario, Paciente, Telefono, Psicologo, HorPsicologo, Conversacion, Mensaje, ConvUsuario, Cita, Modalidad, EdoCita, Servicio
 from django.contrib import messages
@@ -20,23 +21,31 @@ def paciente(request):
     # 1. Obtener instancia del paciente
     paciente_instancia = get_object_or_404(Paciente, usuario=request.user)
     ahora = timezone.now()
+    hoy_fecha = ahora.date()
+    ahora_hora = ahora.time()
 
     # --- LÓGICA PARA EL DASHBOARD ---
     
     # 1. Próxima cita (la más cercana a partir de ahora, que esté Pendiente)
-    proxima_cita = Cita.objects.filter(
+    citas_pendientes = Cita.objects.filter(
         paciente=paciente_instancia,
-        estado__nombre='Pendiente',
-        fecha__gte=ahora.date()
-    ).order_by('fecha', 'hora').first()
+        estado__nombre='Pendiente'
+    ).filter(
+        Q(fecha__gt=hoy_fecha) | 
+        Q(fecha=hoy_fecha, hora__gte=ahora_hora)
+    ).order_by('fecha', 'hora')
+
+    # La primera del queryset es la "Próxima cita"
+    proxima_cita = citas_pendientes.first()
 
     # 2. Siguientes 3 citas (después de la proxima_cita)
     siguientes_citas = []
     if proxima_cita:
-        siguientes_citas = Cita.objects.filter(
-            paciente=paciente_instancia,
-            estado__nombre='Pendiente'
-        ).exclude(numero=proxima_cita.numero).order_by('fecha', 'hora')[:3]
+        # Excluimos la que ya pusimos en la tarjeta principal
+        siguientes_citas = citas_pendientes.exclude(numero=proxima_cita.numero)[:3]
+    else:
+        # Si no hubo próxima cita, intentamos llenar la lista lateral con lo que haya
+        siguientes_citas = citas_pendientes[:3]
     
     # 3. Sesiones Realizadas (Citas con estado 'Atendida' o 'Completada')
     # Ajusta el nombre del estado según tu base de datos
@@ -211,29 +220,32 @@ def obtener_mensajes_paciente(request):
     if not psicologo_user_id:
         return JsonResponse([], safe=False)
 
-    # 1. Buscamos la conversación que comparten el paciente y el psicólogo
-    # Primero obtenemos todas las conversaciones del paciente actual
-    mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
-    
-    # Buscamos si en alguna de esas conversaciones también está el psicólogo
-    relacion_comun = ConvUsuario.objects.filter(
-        conversacion_id__in=mis_convs, 
-        usuario_id=psicologo_user_id
-    ).first()
+    conversacion_final = None
 
-    if not relacion_comun:
+    if psicologo_user_id == 'SOPORTE':
+        # Buscar conversación donde esté el paciente y un admin
+        relacion = ConvUsuario.objects.filter(
+            usuario=request.user,
+            conversacion__convusuario__usuario__is_staff=True
+        ).distinct().first()
+        if relacion:
+            conversacion_final = relacion.conversacion
+    else:
+        mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+        relacion_comun = ConvUsuario.objects.filter(
+            conversacion_id__in=mis_convs, 
+            usuario_id=psicologo_user_id
+        ).first()
+        if relacion_comun:
+            conversacion_final = relacion_comun.conversacion
+
+    if not conversacion_final:
         return JsonResponse([], safe=False)
 
-    # 2. Obtenemos los mensajes usando el campo 'conversacion' y ordenamos por 'fechaEnvio'
-    mensajes_queryset = Mensaje.objects.filter(
-        conversacion=relacion_comun.conversacion
-    ).order_by('fechaEnvio')
+    mensajes_queryset = Mensaje.objects.filter(conversacion=conversacion_final).order_by('fechaEnvio')
 
-    # 3. Marcar mensajes del psicólogo como leídos
-    Mensaje.objects.filter(
-        conversacion=relacion_comun.conversacion,
-        leido=False
-    ).exclude(usuario=request.user).update(leido=True)
+    # Marcar como leídos
+    Mensaje.objects.filter(conversacion=conversacion_final, leido=False).exclude(usuario=request.user).update(leido=True)
     
     data = []
     for m in mensajes_queryset:
@@ -242,11 +254,10 @@ def obtener_mensajes_paciente(request):
             'texto': m.contenido,
             'tipo': 'sent' if m.usuario == request.user else 'received',
             'hora': hora_local.strftime('%I:%M %p'),
-            'fecha_completa': hora_local.strftime('%Y-%m-%d'), # Formato para comparar: 2026-04-15
-            'dia_str': hora_local.strftime('%d de %B, %Y'), # Formato legible
+            'fecha_completa': hora_local.strftime('%Y-%m-%d'),
+            'dia_str': hora_local.strftime('%d de %B, %Y'),
             'leido': m.leido
         })
-        
     return JsonResponse(data, safe=False)
 
 @login_required
@@ -258,22 +269,34 @@ def enviar_mensaje_paciente(request):
         if not receptor_id or not contenido:
             return JsonResponse({'status': 'error'}, status=400)
 
-        # 1. Verificar si ya existe la conversación o crearla
-        mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
-        relacion = ConvUsuario.objects.filter(
-            conversacion_id__in=mis_convs, 
-            usuario_id=receptor_id
-        ).first()
+        conversacion_obj = None
 
-        if relacion:
-            conversacion_obj = relacion.conversacion
+        if receptor_id == 'SOPORTE':
+            relacion = ConvUsuario.objects.filter(
+                usuario=request.user,
+                conversacion__convusuario__usuario__is_staff=True
+            ).distinct().first()
+            
+            if relacion:
+                conversacion_obj = relacion.conversacion
+            else:
+                conversacion_obj = Conversacion.objects.create(fechaInicio=timezone.now())
+                ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=request.user)
+                for admin in Usuario.objects.filter(is_staff=True):
+                    ConvUsuario.objects.get_or_create(conversacion=conversacion_obj, usuario=admin)
         else:
-            conversacion_obj = Conversacion.objects.create(fechaInicio=timezone.now())
-            ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=request.user)
-            psicologo_user = get_object_or_404(Usuario, numero=receptor_id)
-            ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=psicologo_user)
+            # Lógica normal para psicólogos
+            mis_convs = ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True)
+            relacion = ConvUsuario.objects.filter(conversacion_id__in=mis_convs, usuario_id=receptor_id).first()
 
-        # 2. Crear el mensaje (SOLO UNA VEZ)
+            if relacion:
+                conversacion_obj = relacion.conversacion
+            else:
+                conversacion_obj = Conversacion.objects.create(fechaInicio=timezone.now())
+                ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=request.user)
+                psicologo_user = get_object_or_404(Usuario, numero=receptor_id)
+                ConvUsuario.objects.create(conversacion=conversacion_obj, usuario=psicologo_user)
+
         nuevo_msg = Mensaje.objects.create(
             contenido=contenido,
             fechaEnvio=timezone.now(),
@@ -281,7 +304,6 @@ def enviar_mensaje_paciente(request):
             usuario=request.user
         )
 
-        # Devolvemos los datos del UNICO mensaje creado
         return JsonResponse({
             'status': 'ok',
             'contenido': nuevo_msg.contenido,
