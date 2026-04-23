@@ -5,12 +5,11 @@ from datetime import datetime, date
 from django.db import transaction
 from datetime import timedelta
 from django.db.models.functions import ExtractMonth
-from django.db.models import Count
+from django.db.models import Count, Q, Max
 from ..models import  Paciente, Telefono, Sesion, Pago, Usuario, Psicologo, Mensaje, ConvUsuario, Cita, EdoCita, Consulta, Expediente, Antecedentes, Evolucion, Medicacion, PlanTrabajo, EdoEmocional, Conversacion
 from django.contrib import messages
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.db.models import Q
 import json
 from django.http import JsonResponse
 from django.contrib.auth import get_user_model
@@ -185,6 +184,11 @@ def api_detalle_paciente(request, paciente_id):
             "foto": paciente.usuario.fotoPerfil.url if paciente.usuario.fotoPerfil else '/media/perfiles/default.png',
             "ocupacion": expediente.ocupacion if expediente else "No registrada",
             "estado_civil": expediente.estado_civil if expediente else "No registrado",
+            
+            # --- AQUÍ ESTÁ LA CORRECCIÓN ---
+            "riesgos": expediente.riesgos if expediente else "Ninguno", 
+            # -------------------------------
+
             "fecha_nacimiento": paciente.fechaNacimiento.strftime('%d/%m/%Y'),
             "fecha_creacion": expediente.fechaCreacion.strftime('%d/%m/%Y') if expediente else "N/A",
             "antecedentes": {
@@ -197,7 +201,7 @@ def api_detalle_paciente(request, paciente_id):
                 "fecha": ev.fecha.strftime('%d/%m/%Y'),
                 "notas": ev.notas
             } for ev in evoluciones],
-            "historial": historial_data  # USAR SOLO ESTA VARIABLE
+            "historial": historial_data
         }
         return Response(data)
     except Paciente.DoesNotExist:
@@ -338,7 +342,14 @@ def panel_psicologos(request):
     # --- LÓGICA DE PACIENTES PARA EL CHAT ---
     # Obtenemos los IDs de los pacientes que tienen citas con este psicólogo
     pacientes_ids = Cita.objects.filter(psicologo=psicologo).values_list('paciente_id', flat=True).distinct()
-    mis_pacientes = Paciente.objects.filter(numero__in=pacientes_ids).select_related('usuario')
+
+    # 2. Consulta con el camino de relación correcto
+    mis_pacientes = Paciente.objects.filter(numero__in=pacientes_ids).select_related('usuario').annotate(
+        ultima_fecha_mensaje=Max(
+            'usuario__convusuario__conversacion__mensaje__fechaEnvio',
+            filter=Q(usuario__convusuario__conversacion__convusuario__usuario=request.user)
+        )
+    ).order_by('-ultima_fecha_mensaje')
 
     # IDs de conversaciones donde participa el psicólogo
     mis_conv_ids = list(ConvUsuario.objects.filter(usuario=request.user).values_list('conversacion_id', flat=True))
@@ -359,8 +370,11 @@ def panel_psicologos(request):
                 pac.sin_leer = (not ultimo_msg.leido and ultimo_msg.usuario != request.user)
             else:
                 pac.ultimo_texto = "Sin mensajes"
+                # Si no hay mensajes, le damos una fecha mínima para que aparezcan al final
+                pac.ultima_hora = None 
         else:
             pac.ultimo_texto = "Sin chat iniciado"
+            pac.ultima_hora = None
 
     # --- HISTORIALES ---
     citas_pendientes = Cita.objects.filter(psicologo=psicologo, estado__nombre='Pendiente').order_by('fecha', 'hora')
@@ -495,6 +509,8 @@ def guardar_expediente_ajax(request):
     if request.method == 'POST':
         try:
             paciente_id = request.POST.get('paciente_id')
+            if not paciente_id or paciente_id == 'null':
+                return JsonResponse({'status': 'error', 'message': 'ID de paciente no recibido'}, status=400)
             paciente = Paciente.objects.get(numero=paciente_id)
 
             expediente = Expediente.objects.create(
@@ -683,28 +699,34 @@ def editar_datos_expediente(request):
             u_id = request.POST.get('paciente_id')
             ocu = request.POST.get('ocupacion')
             civil = request.POST.get('estado_civil')
+            riesgos = request.POST.get('riesgos') # Recibimos el nuevo campo
 
-            # BUSQUEDA CLAVE: Buscar paciente donde el usuario vinculado tenga numero X
+            # Buscamos al paciente por el número de usuario vinculado
             paciente_obj = Paciente.objects.filter(usuario__numero=u_id).first()
 
             if not paciente_obj:
-                return JsonResponse({'status': 'error', 'message': f'No existe paciente para usuario {u_id}'}, status=400)
+                return JsonResponse({'status': 'error', 'message': 'Paciente no encontrado'}, status=400)
 
-            # Usar get_or_create para evitar errores si no existe el expediente aún
+            # Obtenemos o creamos el expediente
             expediente, created = Expediente.objects.get_or_create(
                 paciente=paciente_obj,
-                defaults={'ocupacion': ocu, 'estado_civil': civil, 'fechaCreacion': timezone.now().date()}
+                defaults={
+                    'ocupacion': ocu, 
+                    'estado_civil': civil, 
+                    'riesgos': riesgos,
+                    'fechaCreacion': timezone.now().date()
+                }
             )
 
             if not created:
                 expediente.ocupacion = ocu
                 expediente.estado_civil = civil
+                expediente.riesgos = riesgos # Guardamos riesgos
                 expediente.save()
 
             return JsonResponse({'status': 'success', 'message': 'Guardado correctamente'})
 
         except Exception as e:
-            # ESTO ES VITAL: Si falla, devolvemos el error exacto en el JSON
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
             
     return JsonResponse({'status': 'error', 'message': 'Solo POST'}, status=405)

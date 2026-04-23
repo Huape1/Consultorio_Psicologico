@@ -731,11 +731,6 @@ section {
     overflow-y: auto; /* Permite scroll dentro del fondo oscuro si el modal es muy alto */
 }
 
-.modal-content {
-    margin: 5% auto; /* Menos margen arriba para que quepa mejor */
-    max-height: 90vh; /* Que no se pase del alto de la pantalla */
-    overflow-y: auto; /* Scroll interno en el formulario si es necesario */
-}
 
 /* CHAT */
 
@@ -2416,14 +2411,6 @@ section {
     align-items: center;
 }
 
-.modal-content {
-    background-color: white;
-    padding: 30px;
-    border-radius: 12px;
-    width: 400px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-}
-
 
 
 
@@ -2585,8 +2572,8 @@ section {
 /* Sidebar Profile Widget */
 .user-profile-widget {
     background: #1c757f;
-    margin: 10px;
-    padding: 12px;
+    margin: 6px;
+    padding: 12px 10px;
     border-radius: 12px;
     display: flex;
     align-items: center;
@@ -2729,4 +2716,387 @@ section {
     margin-bottom: 20px;
     color: #264653;
     font-size: 1.1rem;
+}
+
+
+
+
+
+/*
+    Estilos de registro psicodiagnositoco
+*/
+
+#modal-expediente.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    overflow-y: auto;
+    padding: 20px;
+    /* AÑADE ESTAS DOS LÍNEAS */
+    z-index: 1000; 
+    display: flex; /* Ayuda a centrar el contenido */
+    justify-content: center;
+    align-items: flex-start;
+}
+
+#modal-expediente .modal-content {
+    background: #ffffff;
+    width: 90%;
+    max-width: 850px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+#modal-expediente .modal-header {
+    background: #f8fafc;
+    padding: 20px 30px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#modal-expediente .modal-header h3 {
+    color: #264653;
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+#modal-expediente .modal-header h3 i {
+    color: #0FA3B1;
+}
+
+/* Badge del Paciente */
+#modal-expediente .patient-highlight {
+    background: #e0f2f1;
+    color: #00796b;
+    padding: 10px 20px;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    font-size: 0.95rem;
+    border-left: 4px solid #0FA3B1;
+}
+
+/* Cuerpo y Grid */
+#modal-expediente .modal-body {
+    padding: 30px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+#modal-expediente .modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+}
+
+#modal-expediente .full-width {
+    grid-column: span 2;
+}
+
+/* Secciones del Formulario */
+#modal-expediente .form-section h4 {
+    color: #0FA3B1;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #f0f4f8;
+    padding-bottom: 5px;
+}
+
+/* Inputs y Textareas */
+#modal-expediente .input-groups {
+    margin-bottom: 15px;
+}
+
+#modal-expediente .input-groups label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 6px;
+}
+
+#modal-expediente .input-groups input,
+#modal-expediente .input-groups select,
+#modal-expediente .input-groups textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #cbd5e0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    background: #fbfcfd;
+}
+
+#modal-expediente .input-groups textarea {
+    resize: none;
+}
+
+#modal-expediente .input-groups input:focus,
+#modal-expediente .input-groups textarea:focus {
+    outline: none;
+    border-color: #0FA3B1;
+    box-shadow: 0 0 0 3px rgba(15, 163, 177, 0.1);
+    background: #fff;
+}
+
+/* Footer y Botones */
+#modal-expediente .modal-footer {
+    padding: 20px 30px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+}
+
+#modal-expediente .btn-primary {
+    background: #0FA3B1;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#modal-expediente .btn-primary:hover {
+    background: #0d8a96;
+}
+
+#modal-expediente .btn-secondary {
+    background: #edf2f7;
+    color: #4a5568;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+
+#texto-nueva-nota btn{
+    background-color: #0FA3B1;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+
+
+/*
+MODAL DE EDITAR DATOS BASICOS
+*/
+
+/* Contenedor principal del modal */
+#modal-editar-datos {
+    display: none; /* Se activa con JS */
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6); /* Fondo oscurecido */
+    backdrop-filter: blur(4px); /* Efecto de desenfoque al fondo */
+    align-items: center;
+    justify-content: center;
+}
+
+/* La tarjeta blanca central */
+#modal-editar-datos .modal-content {
+    background-color: #ffffff;
+    padding: 0;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+    overflow: hidden; /* Para que el header respete los bordes redondeados */
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Encabezado del modal */
+#modal-editar-datos h3 {
+    background: #00bcd4; /* Tu color principal */
+    color: white;
+    margin: 0;
+    padding: 20px;
+    font-size: 1.25rem;
+    text-align: center;
+}
+
+/* Cuerpo del formulario */
+#modal-editar-datos #form-editar-datos {
+    padding: 25px;
+}
+
+/* Grupos de formularios */
+#modal-editar-datos .form-group {
+    margin-bottom: 18px;
+}
+
+#modal-editar-datos label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #444;
+    font-size: 0.9rem;
+}
+
+/* Estilo de inputs, selects y textareas */
+#modal-editar-datos .form-control {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #eee;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    box-sizing: border-box; /* Evita que el padding ensanche el input */
+}
+
+/* Efecto al hacer clic en un campo */
+#modal-editar-datos .form-control:focus {
+    border-color: #00bcd4;
+    outline: none;
+    box-shadow: 0 0 8px rgba(0, 188, 212, 0.2);
+}
+
+/* Botones */
+#modal-editar-datos .modal-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 25px;
+}
+
+#modal-editar-datos .btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.2s;
+}
+
+#modal-editar-datos .btn-primary {
+    background-color: #00bcd4;
+    color: white;
+}
+
+#modal-editar-datos .btn-secondary {
+    background-color: #f1f1f1;
+    color: #666;
+}
+
+#modal-editar-datos .btn:hover {
+    opacity: 0.9;
+}
+
+/* Animación de entrada */
+@keyframes slideIn {
+    from { transform: translateY(-30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+
+
+/*
+Evolución del paciente
+*/
+
+/* Contenedor de la nueva nota */
+.card #nueva-nota-container {
+    display: none; 
+    margin-bottom: 20px; 
+    background: #ffffff; 
+    padding: 20px; 
+    border-radius: 12px;
+    border: 1px solid #e0e6ed;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* El área de texto */
+.card #texto-nueva-nota {
+    width: 100%; 
+    height: 100px; 
+    margin-bottom: 15px;
+    padding: 12px;
+    border: 2px solid #edf2f7;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+    transition: border-color 0.3s;
+    box-sizing: border-box;
+}
+
+.card #texto-nueva-nota:focus {
+    outline: none;
+    border-color: #00bcd4;
+    background-color: #f8ffff;
+}
+
+/* Contenedor de botones para alinearlos a la derecha */
+.card .nota-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Botón Guardar específico */
+.card .btn-save-note {
+    background-color: #00bcd4;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.3s, transform 0.2s;
+}
+
+.card .btn-save-note:hover {
+    background-color: #00acc1;
+    transform: translateY(-1px);
+}
+
+/* Botón Cancelar específico */
+.card .btn-cancel-note {
+    background-color: #f1f5f9;
+    color: #64748b;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.card .btn-cancel-note:hover {
+    background-color: #e2e8f0;
+    color: #475569;
 }

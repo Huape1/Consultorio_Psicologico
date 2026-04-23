@@ -1,4 +1,5 @@
 window.verExpediente = verExpediente;
+let expedienteActualId = null;
 // Al inicio del archivo
 let currentPacienteId = null;
 
@@ -14,6 +15,108 @@ document.addEventListener('DOMContentLoaded', () => {
 // ========================
 
 let pacienteSeleccionadoId = null;
+
+// --- FUNCIÓN AUXILIAR PARA MOVER AL PACIENTE AL PRINCIPIO ---
+function moverPacienteAlInicio(pacienteId, texto, hora, esMio) {
+    const lista = document.getElementById('lista-pacientes-chat');
+    // Buscamos el <li> que tiene el onclick con ese ID
+    const items = lista.querySelectorAll('li');
+    let itemPaciente = null;
+
+    items.forEach(li => {
+        // Adaptado a tu función seleccionarChatPaciente(id, ...)
+        if (li.getAttribute('onclick').includes(`'${pacienteId}'`) || li.getAttribute('onclick').includes(`${pacienteId}`)) {
+            itemPaciente = li;
+        }
+    });
+
+    if (itemPaciente) {
+        // 1. Actualizar el contenido visual en el sidebar
+        const msgContent = itemPaciente.querySelector('.msg-content');
+        const msgTime = itemPaciente.querySelector('.chat-time');
+        const lastMsgDiv = itemPaciente.querySelector('.chat-last-msg');
+
+        if (msgContent) msgContent.innerText = texto;
+        if (msgTime) msgTime.innerText = hora;
+
+        // 2. Gestionar prefijo "Tú: "
+        if (lastMsgDiv) {
+            const prefix = lastMsgDiv.querySelector('.tu-prefix');
+            if (esMio) {
+                if (!prefix) {
+                    lastMsgDiv.insertAdjacentHTML('afterbegin', '<span class="tu-prefix">Tú: </span>');
+                }
+            } else {
+                if (prefix) prefix.remove();
+                // Si recibimos y no estamos en ese chat, marcar como unread
+                if (pacienteSeleccionadoId !== pacienteId) {
+                    itemPaciente.classList.add('unread');
+                }
+            }
+        }
+
+        // 3. LA MAGIA: Mover al principio de la lista
+        lista.prepend(itemPaciente);
+    }
+}
+
+// --- ACTUALIZACIÓN DEL ENVÍO ---
+document.getElementById('form-chat-psicologo').onsubmit = async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('input-mensaje-psicologo');
+    const receptorId = document.getElementById('receptor_paciente_id').value;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    const textoParaEnviar = input.value; 
+
+    const formData = new FormData();
+    formData.append('contenido', textoParaEnviar);
+    formData.append('receptor_id', receptorId);
+
+    const response = await fetch('/enviar_mensaje_paciente/', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-CSRFToken': csrfToken }
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.status === 'ok') {
+        input.value = ''; 
+        actualizarMensajesPsicologo();
+
+        // Llamamos a la función para mover el chat arriba
+        // Usamos la hora que devuelve tu servidor
+        moverPacienteAlInicio(receptorId, data.contenido, data.hora, true);
+    }
+};
+
+// --- ACTUALIZACIÓN DEL AUTO-REFRESH ---
+async function actualizarMensajesPsicologo() {
+    if (!pacienteSeleccionadoId) return;
+    const box = document.getElementById('chat-box-psicologo');
+
+    try {
+        const response = await fetch(`/obtener-mensajes-psicologo/?paciente_id=${pacienteSeleccionadoId}`);
+        const data = await response.json();
+
+        // Si hay mensajes, verificamos el último para reordenar el sidebar si es necesario
+        if (data.length > 0) {
+            const ultimo = data[data.length - 1];
+            // Solo movemos si el último mensaje es nuevo o para mantener el orden
+            moverPacienteAlInicio(pacienteSeleccionadoId, ultimo.texto, ultimo.hora, ultimo.tipo === 'sent');
+        }
+
+        // ... (Tu lógica existente de dibujar los mensajes en el box) ...
+        box.innerHTML = ''; 
+        let ultimaFecha = null;
+        data.forEach(msg => {
+            // ... (Tu código de renderizado de mensajes se mantiene igual) ...
+            // [Copia aquí el bloque data.forEach que ya tienes]
+        });
+        box.scrollTop = box.scrollHeight;
+    } catch (e) { console.error("Error:", e); }
+}
 
 // Función para cargar mensajes (La "buena" que ya te servía)
 async function actualizarMensajesPsicologo() {
@@ -64,6 +167,7 @@ async function actualizarMensajesPsicologo() {
         box.scrollTop = box.scrollHeight;
     } catch (e) { console.error("Error:", e); }
 }
+
 
 // Función al seleccionar paciente
 function seleccionarChatPaciente(id, nombre, event) {
@@ -206,6 +310,7 @@ async function cargarPacientesCards() {
 }
 
 async function verExpediente(pacienteId) {
+    document.querySelectorAll('[id^="side-ant-"]').forEach(el => el.innerText = "Cargando...");
     console.log("Cargando paciente ID:", pacienteId);
     currentPacienteId = pacienteId;
     
@@ -222,6 +327,7 @@ async function verExpediente(pacienteId) {
         document.getElementById('exp-civil').innerText = data.estado_civil || "N/A";
         document.getElementById('exp-nacimiento').innerText = data.fecha_nacimiento;
         document.getElementById('exp-creacion').innerText = data.fecha_creacion;
+        document.getElementById('exp-riesgos').innerText = data.riesgos || "Ninguno";
 
         // 2. Antecedentes (Verifica que el ID exista antes de asignar)
         const elTraumas = document.getElementById('exp-traumas');
@@ -351,9 +457,23 @@ function mostrarInputNota() {
 
 async function guardarEvolucion() {
     const notasArea = document.getElementById('texto-nueva-nota');
-    const notas = notasArea.value;
+    const btnGuardar = document.querySelector('.btn-save-note');
+    const notas = notasArea.value.trim();
     
-    if (!notas) return alert("Por favor, escribe una nota.");
+    // 1. Validación con SweetAlert
+    if (!notas) {
+        return Swal.fire({
+            icon: 'warning',
+            title: 'Nota vacía',
+            text: 'Por favor, escribe el avance del paciente antes de guardar.',
+            confirmButtonColor: '#00bcd4'
+        });
+    }
+
+    // 2. Bloquear botón y mostrar estado de carga
+    const originalHTML = btnGuardar.innerHTML;
+    btnGuardar.disabled = true;
+    btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
 
     try {
         const response = await fetch('/api/guardar-evolucion/', {
@@ -375,27 +495,51 @@ async function guardarEvolucion() {
             notasArea.value = '';
             document.getElementById('nueva-nota-container').style.display = 'none';
 
-            // Insertar la nueva nota al principio de la lista visualmente
+            // 3. Insertar la nueva nota visualmente
             const divEvoluciones = document.getElementById('lista-evoluciones');
             const nuevaNotaHTML = `
-                <div style="border-left: 2px solid #00bcd4; padding-left: 15px; margin-bottom: 20px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                    <span style="font-size: 0.8rem; color: #888;">${result.fecha} (Reciente)</span>
-                    <p style="margin: 5px 0;">${result.notas}</p>
+                <div style="border-left: 4px solid #00bcd4; padding-left: 15px; margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); animation: fadeIn 0.5s ease-in-out;">
+                    <span style="font-size: 0.8rem; color: #00bcd4; font-weight: bold;">
+                        <i class="fas fa-clock"></i> ${result.fecha || 'Recién guardado'}
+                    </span>
+                    <p style="margin: 8px 0; color: #333; line-height: 1.4;">${result.notas || notas}</p>
                 </div>
             `;
             
-            // Si decía "No hay notas", borramos ese mensaje primero
             if (divEvoluciones.innerText.includes("No hay notas")) {
                 divEvoluciones.innerHTML = nuevaNotaHTML;
             } else {
                 divEvoluciones.insertAdjacentHTML('afterbegin', nuevaNotaHTML);
             }
             
-            alert("Evolución guardada correctamente.");
+            // 4. Alerta de éxito elegante
+            Swal.fire({
+                icon: 'success',
+                title: '¡Guardado!',
+                text: 'La nota de evolución se ha registrado correctamente.',
+                timer: 2000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end',
+                timerProgressBar: true
+            });
+
+        } else {
+            throw new Error(result.error || "Error del servidor");
         }
+
     } catch (error) {
         console.error("Error al guardar:", error);
-        alert("Hubo un error al conectar con el servidor.");
+        Swal.fire({
+            icon: 'error',
+            title: 'Error al guardar',
+            text: error.message || 'Hubo un problema al conectar con el servidor.',
+            confirmButtonColor: '#d33'
+        });
+    } finally {
+        // 5. Restaurar botón siempre
+        btnGuardar.disabled = false;
+        btnGuardar.innerHTML = originalHTML;
     }
 }
 
@@ -665,18 +809,21 @@ document.addEventListener('DOMContentLoaded', () => {
 let currentStep = 1;
 
 function prepararConsulta(btn) {
+    // Extraemos los datos del botón
     const nombre = btn.getAttribute('data-nombre');
-    const fotoUrl = btn.getAttribute('data-foto');
-    const pacienteId = btn.getAttribute('data-id');
-    const citaId = btn.getAttribute('data-cita-id'); // <--- NECESITAS AÑADIR ESTO AL BOTÓN EN HTML
+    const fotoUrl = btn.getAttribute('data-foto'); // Asegúrate de tener este atributo en el botón
+    const pacienteId = btn.getAttribute('data-id'); 
+    const citaId = btn.getAttribute('data-cita-id');
+    const esPrimeraCita = btn.getAttribute('data-primera') === "1";
     
-    const necesitaExpediente = btn.getAttribute('data-primera') === "1";
+    console.log("Abriendo consulta para:", nombre, "ID Paciente:", pacienteId);
 
-    if (necesitaExpediente) {
-        abrirModalExpediente(nombre, pacienteId);
+    if (esPrimeraCita) {
+        // Si es primera vez, abrimos el modal del expediente
+        abrirModalExpediente(nombre, '', '', pacienteId);
     } else {
-        // Pasamos los 4 argumentos
-        abrirSesion(nombre, fotoUrl, pacienteId, citaId);
+        // CAMBIO AQUÍ: Usamos el nombre correcto de tu función: abrirSesion
+        abrirSesion(nombre, fotoUrl, pacienteId, citaId); 
     }
 }
 
@@ -692,13 +839,26 @@ function gestionarInicioConsulta(nombre, fotoUrl, esPrimeraVez) {
     }
 }
 
-function abrirModalExpediente(nombre, pacienteId) { // Añade pacienteId
+function abrirModalExpediente(nombre, apellido1, apellido2, pacienteId) {
     const modal = document.getElementById('modal-expediente');
-    if (modal) {
+    const inputHidden = document.getElementById('modal-paciente-id');
+    const labelNombre = document.querySelector('.paciente-nombre-modal');
+
+    if (modal && inputHidden) {
+        // Inyectamos el ID en el input para que FormData lo recoja al hacer submit
+        inputHidden.value = pacienteId; 
+        
+        // Actualizamos el nombre en el modal
+        if (labelNombre) {
+            labelNombre.textContent = nombre;
+        }
+
+        // Mostramos el modal
         modal.style.display = 'flex';
-        modal.querySelector('.paciente-nombre-modal').innerText = nombre;
-        // Guardamos el ID en un input oculto o atributo
-        modal.setAttribute('data-paciente-id', pacienteId);
+        
+        console.log("ID del paciente listo para envío:", inputHidden.value);
+    } else {
+        console.error("Error: No se encontró el input 'modal-paciente-id' dentro del formulario.");
     }
 }
 
@@ -707,52 +867,93 @@ function cerrarModalExpediente() {
     const modal = document.getElementById('modal-expediente');
     const form = document.getElementById('form-nuevo-expediente');
     
-    if (modal) {
-        modal.style.display = 'none';
-        if (form) form.reset(); // Limpia los campos para la próxima vez
+    // Verificamos si hay texto en los textareas para no perder datos por error
+    const tieneContenido = Array.from(form.querySelectorAll('textarea')).some(t => t.value.length > 0);
+
+    if (tieneContenido && modal.style.display !== 'none') {
+        Swal.fire({
+            title: '¿Descartar cambios?',
+            text: "Se perderá la información escrita en el psicodiagnóstico.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Sí, descartar',
+            cancelButtonText: 'Seguir editando',
+            // ESTA PROPIEDAD ES CLAVE
+            target: 'body', 
+            didOpen: () => {
+                // Opcional: Forzar un z-index altísimo manualmente si sigue fallando
+                const container = Swal.getContainer();
+                if (container) container.style.zIndex = "9999";
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                modal.style.display = 'none';
+                form.reset();
+            }
+        });
+    } else {
+        if (modal) modal.style.display = 'none';
+        if (form) form.reset();
     }
 }
 
 // Función que se ejecuta al enviar el formulario
+// Función que se ejecuta al enviar el formulario del expediente
 document.getElementById('form-nuevo-expediente').addEventListener('submit', function(e) {
     e.preventDefault();
-
-    const modal = document.getElementById('modal-expediente');
-    const pacienteId = modal.getAttribute('data-paciente-id');
+    
     const formData = new FormData(this);
-    formData.append('paciente_id', pacienteId);
+    const pId = formData.get('paciente_id');
 
-    // Ya no definimos la función aquí, solo la llamamos
-    const csrftoken = getCookie('csrftoken'); 
+    if (!pId || pId === "" || pId === "null") {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Identificación',
+            text: 'No se detectó el ID del paciente. Intenta cerrar y abrir el modal de nuevo.'
+        });
+        return;
+    }
 
-    fetch('/guardar-expediente/', {
+    // Mostrar spinner de carga
+    Swal.fire({
+        title: 'Guardando Registro...',
+        text: 'Estamos procesando el psicodiagnóstico',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    fetch('/guardar-expediente/', { 
         method: 'POST',
         body: formData,
         headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRFToken': csrftoken, // <--- Aquí se envía el token correctamente
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
         }
     })
-    .then(response => {
-        // Verificamos si la respuesta es JSON antes de procesarla
-        if (!response.ok) {
-            return response.text().then(text => { throw new Error(text) });
-        }
-        return response.json();
-    })
+    .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            alert("Expediente guardado exitosamente");
-            const nombre = document.querySelector('.paciente-nombre-modal').innerText;
-            const foto = document.querySelector('.large-avatar').src;
-            
-            cerrarModalExpediente();
-            abrirSesion(nombre, foto);
+            Swal.fire({
+                icon: 'success',
+                title: '¡Expediente guardado!',
+                text: 'El historial se ha creado correctamente.',
+                timer: 1500,
+                showConfirmButton: false
+            }).then(() => {
+                cerrarModalExpediente();
+                location.reload(); 
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: data.message
+            });
         }
     })
     .catch(error => {
-        console.error('Error detallado:', error);
-        alert("Error de seguridad o de servidor. Revisa la consola.");
+        console.error('Error:', error);
+        Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No se pudo contactar con el servidor.' });
     });
 });
 
@@ -930,30 +1131,65 @@ function changeStep(n) {
 function submitConsulta() {
     const form = document.getElementById('form-multistep-sesion');
     const formData = new FormData(form);
-    
-    // Función para obtener el CSRF token (puedes reutilizar la que ya tienes arriba)
     const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    fetch('/guardar-consulta/', { // Asegúrate de que esta URL coincida con tu urls.py
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRFToken': csrftoken,
+    // Confirmación antes de finalizar
+    Swal.fire({
+        title: '¿Finalizar Sesión?',
+        text: "Se guardarán todos los registros y se cerrará la consulta actual.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981', // Verde éxito
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, finalizar',
+        cancelButtonText: 'Revisar datos'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Spinner de carga
+            Swal.fire({
+                title: 'Guardando consulta...',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            fetch('/guardar-consulta/', { 
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrftoken,
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Consulta guardada!',
+                        text: 'La sesión se registró con éxito.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire({ 
+                        icon: 'warning', 
+                        title: 'Datos incompletos', 
+                        text: data.message || 'Por favor, revisa que todos los campos obligatorios estén llenos.',
+                        confirmButtonColor: '#f8bb86'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                Swal.fire({ 
+                    icon: 'error', 
+                    title: 'Error crítico', 
+                    text: 'Ocurrió un fallo de conexión al intentar guardar.' 
+                });
+            });
         }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert("¡Consulta guardada con éxito!");
-            window.location.reload(); // O redirige al panel
-        } else {
-            alert("Error: " + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert("Ocurrió un error al guardar la sesión.");
     });
 }
 
@@ -984,27 +1220,41 @@ function abrirEdicionAntecedentes() {
         return;
     }
 
-    // Ponemos el ID en el campo oculto
-    document.getElementById('edit_paciente_id').value = currentPacienteId;
+    // 1. Asignamos el ID al campo oculto del formulario
+    const inputId = document.getElementById('edit_paciente_id');
+    if (inputId) inputId.value = currentPacienteId;
 
-    // Extraemos el texto de la pantalla lateral y lo pasamos a los textareas del modal
-    // Asegúrate de que los IDs 'exp-traumas', etc., sean los que usas en tu barra lateral
-    document.getElementById('exp_traumas').value = document.getElementById('exp-traumas')?.innerText.trim() || "";
-    document.getElementById('exp_personales').value = document.getElementById('exp-personales')?.innerText.trim() || "";
-    document.getElementById('exp_familiares').value = document.getElementById('exp-familiares')?.innerText.trim() || "";
-    document.getElementById('exp_psicologicos').value = document.getElementById('exp-psicologicos')?.innerText.trim() || "";
+    // 2. Función para obtener el texto de los <span> que acabas de llenar
+    const obtenerTexto = (id) => {
+        const el = document.getElementById(id);
+        if (!el) return "";
+        const txt = el.innerText.trim();
+        // Si el texto es "Ninguno" o "Cargando...", lo dejamos vacío en el editor
+        return ["Ninguno", "Cargando...", "No registrados."].includes(txt) ? "" : txt;
+    };
 
-    // Mostramos el modal
-    document.getElementById('modal-editar-ante').style.display = 'flex';
+    // 3. PASAMOS LOS DATOS: Del expediente (span) al modal (textarea)
+    // Nota: Usamos los IDs exactos de tu HTML
+    document.getElementById('exp_traumas').value = obtenerTexto('exp-traumas');
+    document.getElementById('exp_personales').value = obtenerTexto('exp-pers');
+    document.getElementById('exp_familiares').value = obtenerTexto('exp-fam');
+    document.getElementById('exp_psicologicos').value = obtenerTexto('exp-psico');
+
+    // 4. Mostramos el modal
+    const modal = document.getElementById('modal-editar-ante');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
 }
 
+// 3. Manejar el envío del formulario
 // 3. Manejar el envío del formulario
 document.getElementById('form-editar-ante').addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const pId = document.getElementById('edit_paciente_id').value;
     
-    // Recolectamos lo que escribió el usuario en el modal
+    // Recolectamos datos de los textareas del modal
     const datosNuevos = {
         traumas: document.getElementById('exp_traumas').value,
         personales: document.getElementById('exp_personales').value,
@@ -1018,7 +1268,9 @@ document.getElementById('form-editar-ante').addEventListener('submit', async (e)
     formData.append('ant_familiares', datosNuevos.familiares);
     formData.append('ant_psicologicos', datosNuevos.psicologicos);
 
-    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    // Buscamos el token CSRF
+    const csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+    const csrftoken = csrfEl ? csrfEl.value : "";
 
     try {
         const response = await fetch(`/api/editar-paciente/${pId}/`, {
@@ -1029,25 +1281,35 @@ document.getElementById('form-editar-ante').addEventListener('submit', async (e)
 
         const data = await response.json();
 
-        if (response.ok && data.status === 'success') {
-            // ACTUALIZACIÓN DE LA PANTALLA LATERAL (Donde el psicólogo lee)
-            // IMPORTANTE: Estos IDs deben existir en tu panel derecho
-            if(document.getElementById('exp-traumas')) 
-                document.getElementById('exp-traumas').innerText = datosNuevos.traumas;
-            if(document.getElementById('exp-personales')) 
-                document.getElementById('exp-personales').innerText = datosNuevos.personales;
-            if(document.getElementById('exp-familiares')) 
-                document.getElementById('exp-familiares').innerText = datosNuevos.familiares;
-            if(document.getElementById('exp-psicologicos')) 
-                document.getElementById('exp-psicologicos').innerText = datosNuevos.psicologicos;
+        if (data.status === 'success') {
+            // --- ACTUALIZACIÓN VISUAL INMEDIATA EN PANTALLA ---
+            // Usamos los mismos IDs que el HTML de tu expediente principal
+            const actualizarCampo = (id, valor) => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = valor.trim() !== "" ? valor : "Ninguno";
+            };
+
+            // Estos son los IDs reales de tu <section id="expediente-detalle">
+            actualizarCampo('exp-traumas', datosNuevos.traumas);
+            actualizarCampo('exp-pers', datosNuevos.personales);
+            actualizarCampo('exp-fam', datosNuevos.familiares);
+            actualizarCampo('exp-psico', datosNuevos.psicologicos);
 
             cerrarEdicionAntecedentes();
-            alert("¡Todo actualizado!");
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Actualizado',
+                text: 'Los antecedentes se han guardado correctamente.',
+                timer: 1500,
+                showConfirmButton: false
+            });
         } else {
-            alert("Error: " + (data.error || "No se pudo actualizar"));
+            Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Error desconocido' });
         }
     } catch (error) {
         console.error("Error:", error);
+        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo conectar con el servidor.' });
     }
 });
 
@@ -1169,84 +1431,67 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 function abrirModalEditarDatos() {
-    if (!currentPacienteId) {
-        console.error("No hay un ID de paciente seleccionado");
-        return;
-    }
+    if (!currentPacienteId) return;
 
+    // Leemos los textos actuales de la pantalla
     const ocupacionActual = document.getElementById('exp-ocupacion').innerText;
-    const civilActual = document.getElementById('exp-civil').innerText;
+    const civilActual     = document.getElementById('exp-civil').innerText;
+    const riesgosActual   = document.getElementById('exp-riesgos').innerText;
     
     document.getElementById('edit-paciente-id').value = currentPacienteId;
-    document.getElementById('edit-ocupacion').value = ocupacionActual;
+    document.getElementById('edit-ocupacion').value   = (ocupacionActual === "N/A") ? "" : ocupacionActual;
     document.getElementById('edit-estado-civil').value = civilActual;
-    
+    // Cargamos riesgos (si dice "Ninguno", lo ponemos vacío para editar mejor)
+    document.getElementById('edit-riesgos').value     = (riesgosActual === "Ninguno") ? "" : riesgosActual;
 
     document.getElementById('modal-editar-datos').style.display = 'flex';
 }
 
-function cerrarModalDatos() {
-    document.getElementById('modal-editar-datos').style.display = 'none';
-}
-
-// Asegúrate de tener esta variable global al inicio de tu psicologo.js
-// let currentPacienteId = null; 
-
 document.getElementById('form-editar-datos').addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    // 1. Recolectamos los valores de los inputs del modal
     const pId = document.getElementById('edit-paciente-id').value;
     const ocu = document.getElementById('edit-ocupacion').value;
     const civ = document.getElementById('edit-estado-civil').value;
+    const rie = document.getElementById('edit-riesgos').value; // Obtenemos riesgo
 
-    // Log para depuración en el navegador
-    console.log("Datos a enviar:", { pId, ocu, civ });
-
-    // 2. Preparamos el FormData
     const formData = new FormData();
     formData.append('paciente_id', pId);
     formData.append('ocupacion', ocu);
     formData.append('estado_civil', civ);
+    formData.append('riesgos', rie); // Enviamos riesgo
 
-    // 3. Obtenemos el CSRF Token (necesario para Django)
     const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
     try {
-        // 4. Realizamos la petición al servidor
         const response = await fetch('/api/editar-datos-expediente/', {
             method: 'POST',
             body: formData,
-            headers: {
-                'X-CSRFToken': csrftoken 
-            }
+            headers: { 'X-CSRFToken': csrftoken }
         });
 
-        // 5. Procesamos la respuesta JSON
         const data = await response.json();
-        console.log("Respuesta completa del servidor:", data);
 
-        if (response.ok && data.status === 'success') {
-            // ÉXITO: Actualizamos la UI sin recargar
-            document.getElementById('exp-ocupacion').innerText = ocu;
-            document.getElementById('exp-civil').innerText = civ;
+        if (data.status === 'success') {
+            // Actualización visual inmediata
+            document.getElementById('exp-ocupacion').innerText = ocu || "N/A";
+            document.getElementById('exp-civil').innerText     = civ;
+            document.getElementById('exp-riesgos').innerText   = rie || "Ninguno";
             
-            // Cerramos el modal (asumiendo que tienes esta función)
-            cerrarModalEditarDatos(); 
-            
-            alert("¡Datos actualizados correctamente!");
+            cerrarModalDatos(); 
+            Swal.fire({ icon: 'success', title: '¡Actualizado!', timer: 1000, showConfirmButton: false });
         } else {
-            // ERROR: Mostramos el mensaje que viene de Django
-            console.error("Error del servidor:", data.message);
-            alert("Error: " + (data.message || "No se pudo actualizar el expediente"));
+            alert("Error: " + data.message);
         }
-
     } catch (error) {
-        // ERROR DE RED: No se pudo llegar al servidor
-        console.error("Error de conexión:", error);
-        alert("Fallo de conexión con el servidor.");
+        console.error("Error:", error);
+        alert("Fallo de conexión.");
     }
 });
+
+function cerrarModalDatos() {
+    document.getElementById('modal-editar-datos').style.display = 'none';
+}
 
 // Función auxiliar para cerrar el modal (si no la tienes)
 function cerrarModalEditarDatos() {
